@@ -1,0 +1,31 @@
+name: CD - Production
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to home server
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            set -e
+
+            cd ~/website_repos
+
+            git fetch origin
+            git checkout main
+            git pull origin main
+
+            docker compose -f docker/website/docker-compose.yml build
+            docker compose -f docker/website/docker-compose.yml up -d
+
+            docker compose -f docker/nginx/docker-compose.yml up -d

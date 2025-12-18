@@ -1,0 +1,24 @@
+cat > .github/workflows/ci-dev.yml <<'EOF'
+name: CI - Dev
+
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [dev]
+
+jobs:
+  build-website:
+    runs-on: ubuntu-latest
+
+    env:
+      NEXTAUTH_SECRET: ci_dummy_secret
+      NEXTAUTH_URL: http://localhost:3000
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build website image
+        run: docker compose -f docker/website/docker-compose.yml build
+EOF

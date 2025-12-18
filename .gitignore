@@ -1,0 +1,16 @@
+# Secrets
+.env
+.env.*
+docker/secrets/*
+docker/nginx/certbot/conf/**
+docker/nginx/certbot/**
+
+# Node
+node_modules
+.next
+
+# Docker data
+**/volumes
+**/data
+
+
