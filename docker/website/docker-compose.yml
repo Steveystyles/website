@@ -1,0 +1,36 @@
+services:
+  website:
+    container_name: website-app
+    build:
+      context: ../..
+      dockerfile: docker/website/Dockerfile
+    environment:
+      NEXTAUTH_SECRET_FILE: /run/secrets/NEXTAUTH_SECRET
+    depends_on:
+      - db
+    networks:
+      - web
+    restart: unless-stopped
+
+  db:
+    image: postgres:16
+    container_name: website-db
+    environment:
+      POSTGRES_DB: website
+      POSTGRES_USER: website
+      POSTGRES_PASSWORD: websitepass
+    volumes:
+      - website_db:/var/lib/postgresql/data
+    networks:
+      - web
+    restart: unless-stopped
+
+volumes:
+  website_db:
+
+secrets:
+  - NEXTAUTH_SECRET
+  
+networks:
+  web:
+    external: true
