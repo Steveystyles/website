@@ -72,10 +72,15 @@ export const authOptions: NextAuthOptions = {
             ...session.user,
             id: dbUser.id,
             role: dbUser.role,
+          } as typeof session.user & {
+            id: string
+            role: "USER" | "ADMIN"
           }
         }
       }
       return session
-   },
+    },
   },
 }
+   
+  
