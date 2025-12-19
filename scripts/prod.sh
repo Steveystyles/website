@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 set -e
 
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+if [ "$CURRENT_BRANCH" != "main" ]; then
+  echo "❌ REFUSING TO START PROD MODE"
+  echo "   You are on branch '$CURRENT_BRANCH'"
+  echo "   Switch to 'main' first:"
+  echo
+  echo "     git checkout main"
+  echo
+  exit 1
+fi
+
 echo "🚀 Switching to PROD mode..."
 
 # Stop dev stack if running
