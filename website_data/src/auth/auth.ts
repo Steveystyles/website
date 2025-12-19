@@ -1,9 +1,14 @@
 import { readSecret } from "@/lib/secrets"
 import type { NextAuthOptions } from "next-auth"
 import Credentials from "next-auth/providers/credentials"
+import { PrismaAdapter } from "@next-auth/prisma-adapter"
+import { prisma } from "@/lib/prisma"
 
 export const authOptions: NextAuthOptions = {
+  adapter: PrismaAdapter(prisma),
+
   secret: readSecret("NEXTAUTH_SECRET"),
+
   providers: [
     Credentials({
       name: "Credentials",
@@ -11,22 +16,53 @@ export const authOptions: NextAuthOptions = {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
+
       async authorize(credentials) {
-        if (
-          credentials?.email === "admin@example.com" &&
-          credentials?.password === "password"
-        ) {
-          return {
-            id: "1",
-            name: "Admin",
-            email: "admin@example.com",
-          }
+        if (!credentials?.email) {
+          return null
         }
-        return null
+
+        // 🔐 Look up user in database
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email },
+        })
+
+        if (!user) {
+          return null
+        }
+
+        /**
+         * ⚠️ PASSWORD CHECK PLACEHOLDER
+         *
+         * Right now you are not hashing passwords yet.
+         * This is OK for DEV.
+         *
+         * When you add passwords:
+         * - store hashed password on User
+         * - verify here with bcrypt
+         */
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role, // 👈 IMPORTANT
+        }
       },
     }),
   ],
+
   session: {
-    strategy: "jwt",
+    strategy: "database",
+  },
+
+  callbacks: {
+    async session({ session, user }) {
+      if (session.user) {
+        session.user.id = user.id
+        session.user.role = user.role // 👈 expose role to session
+      }
+      return session
+    },
   },
 }
