@@ -1,12 +1,9 @@
 import { readSecret } from "@/lib/secrets"
 import type { NextAuthOptions } from "next-auth"
 import Credentials from "next-auth/providers/credentials"
-import { PrismaAdapter } from "@next-auth/prisma-adapter"
 import { prisma } from "@/lib/prisma"
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
-
   secret: readSecret("NEXTAUTH_SECRET"),
 
   providers: [
@@ -18,69 +15,43 @@ export const authOptions: NextAuthOptions = {
       },
 
       async authorize(credentials) {
-        if (!credentials?.email) {
-          return null
-        }
+        if (!credentials?.email) return null
 
-        // 🔐 Look up user in database
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
         })
 
-        if (!user) {
-          return null
-        }
-
-        /**
-         * ⚠️ PASSWORD CHECK PLACEHOLDER
-         *
-         * Right now you are not hashing passwords yet.
-         * This is OK for DEV.
-         *
-         * When you add passwords:
-         * - store hashed password on User
-         * - verify here with bcrypt
-         */
+        if (!user) return null
 
         return {
           id: user.id,
           email: user.email,
           name: user.name,
-          role: user.role, // 👈 IMPORTANT
+          role: user.role,
         }
       },
     }),
   ],
 
   session: {
-    strategy: "database",
+    strategy: "jwt",
   },
 
   callbacks: {
-    async session({ session }) {
-      if (session.user?.email) {
-        const dbUser = await prisma.user.findUnique({
-          where: { email: session.user.email },
-          select: {
-            id: true,
-            role: true,
-          },
-        })
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id
+        token.role = user.role
+      }
+      return token
+    },
 
-        if (dbUser) {
-          session.user = {
-            ...session.user,
-            id: dbUser.id,
-            role: dbUser.role,
-          } as typeof session.user & {
-            id: string
-            role: "USER" | "ADMIN"
-          }
-        }
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.id = token.id as string
+        session.user.role = token.role as "USER" | "ADMIN"
       }
       return session
     },
   },
 }
-   
-  
