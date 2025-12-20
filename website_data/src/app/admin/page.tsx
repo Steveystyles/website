@@ -1,13 +1,15 @@
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/auth/auth"
+import { requireAdmin } from "@/lib/requireAdmin"
+import { LogoutButton } from "@/components/LogoutButton"
 
 export default async function AdminPage() {
-  const session = await getServerSession(authOptions)
+  const session = await requireAdmin()
 
   return (
-    <div>
+    <div style={{ padding: "2rem" }}>
       <h1>Admin Dashboard</h1>
-      <p>Welcome, {session!.user.email}</p>
+      <p>Welcome, {session.user.email}</p>
+
+      <LogoutButton />
     </div>
   )
 }

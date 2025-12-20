@@ -12,6 +12,8 @@ services:
     environment:
       DATABASE_URL: postgresql://dev:devpass@website-dev-db:5432/devdb
       NEXTAUTH_SECRET: dev-secret
+      NEXTAUTH_URL: http://192.168.0.15:3000
+
 
     volumes:
       - ../../website_data:/app
