@@ -36,10 +36,14 @@ jobs:
 
       - name: Generate Prisma client
         working-directory: website_data
+        env:
+          DATABASE_URL: postgresql://user:pass@localhost:5432/dummy
         run: npx prisma generate
 
-      - name: Validate Prisma schema
+      - name: Prisma schema validation
         working-directory: website_data
+        env:
+          DATABASE_URL: postgresql://user:pass@localhost:5432/dummy
         run: npx prisma validate
 
       - name: Run tests
