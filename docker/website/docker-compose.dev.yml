@@ -1,5 +1,9 @@
 services:
   website-dev:
+    user: "${HOST_UID}:${HOST_GID}"
+    environment:
+    - DATABASE_URL=postgresql://dev:devpass@db:5432/devdb
+
     image: node:20-alpine
     container_name: website-dev
     working_dir: /app
@@ -17,9 +21,7 @@ services:
       - dev
 
   db:
-    image: postgres:16
-    ports:
-      - "5432:5432" 
+    image: postgres:16 
     container_name: website-dev-db
     environment:
       POSTGRES_USER: dev
