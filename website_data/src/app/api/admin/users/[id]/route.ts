@@ -1,32 +1,35 @@
-// @ts-nocheck
-import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
-import { requireAdmin } from "@/lib/requireAdmin"
+import { prisma } from "@/lib/prisma";
+import { requireAdminApi } from "@/lib/requireAdminApi";
 
-export async function PUT(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+export async function PATCH(
+  req: Request,
+  { params }: { params: { id: string } }
 ) {
-  await requireAdmin()
-  const { id } = await params
-  const body = await req.json()
+  const session = await requireAdminApi();
+  if (session instanceof Response) return session;
 
-  await prisma.user.update({
-    where: { id },
-    data: body,
-  })
+  const body = await req.json();
+  const { role } = body as { role: "USER" | "ADMIN" };
 
-  return NextResponse.json({ success: true })
-}
+  if (!role || !["USER", "ADMIN"].includes(role)) {
+    return new Response("Invalid role", { status: 400 });
+  }
 
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  await requireAdmin()
-  const { id } = await params
+  // Prevent admin from demoting themselves
+  if (params.id === session.user.id) {
+    return new Response("Cannot change your own role", { status: 400 });
+  }
 
-  await prisma.user.delete({ where: { id } })
+  const user = await prisma.user.update({
+    where: { id: params.id },
+    data: { role },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+    },
+  });
 
-  return NextResponse.json({ success: true })
+  return Response.json(user);
 }
