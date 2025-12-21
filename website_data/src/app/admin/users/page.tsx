@@ -132,192 +132,383 @@ export default async function AdminUsersPage() {
     orderBy: { email: "asc" },
   });
 
-  return (
-    <>
-      <h1>User Management</h1>
-      <p style={{ color: "#6b7280", marginBottom: 16 }}>
-        Manage user roles. Changes take effect immediately.
-      </p>
-      <section style={{ marginBottom: 24 }}>
-        <h3>Add User</h3>
+  const totalUsers = users.length;
+  const adminUsers = users.filter((user) => user.role === "ADMIN").length;
+  const standardUsers = totalUsers - adminUsers;
 
-        <form action={createUser} style={{ display: "flex", gap: 8 }}>
+  return (
+    <div
+      style={{
+        maxWidth: 1100,
+        margin: "0 auto",
+        padding: "32px 24px 64px",
+        color: "#0f172a",
+      }}
+    >
+      <header style={{ marginBottom: 24 }}>
+        <p
+          style={{
+            textTransform: "uppercase",
+            letterSpacing: "0.12em",
+            fontSize: 12,
+            fontWeight: 600,
+            color: "#64748b",
+            marginBottom: 8,
+          }}
+        >
+          Admin Console
+        </p>
+        <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 6 }}>
+          User Management
+        </h1>
+        <p style={{ color: "#64748b", maxWidth: 520 }}>
+          Create accounts, control admin access, and reset credentials. Changes apply
+          instantly across the platform.
+        </p>
+      </header>
+
+      <section
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: 16,
+          marginBottom: 24,
+        }}
+      >
+        {[
+          { label: "Total users", value: totalUsers },
+          { label: "Admins", value: adminUsers },
+          { label: "Standard users", value: standardUsers },
+        ].map((stat) => (
+          <div
+            key={stat.label}
+            style={{
+              background: "#f8fafc",
+              border: "1px solid #e2e8f0",
+              borderRadius: 12,
+              padding: 16,
+            }}
+          >
+            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>
+              {stat.label}
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 700 }}>{stat.value}</div>
+          </div>
+        ))}
+      </section>
+
+      <section
+        style={{
+          background: "#ffffff",
+          border: "1px solid #e2e8f0",
+          borderRadius: 16,
+          padding: 20,
+          marginBottom: 24,
+          boxShadow: "0 10px 30px -20px rgba(15, 23, 42, 0.35)",
+        }}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>
+            Add a new user
+          </h2>
+          <p style={{ fontSize: 13, color: "#64748b" }}>
+            Invite someone by creating their account and assigning a role.
+          </p>
+        </div>
+
+        <form
+          action={createUser}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            gap: 12,
+          }}
+        >
           <input
             name="email"
-            placeholder="Email"
+            placeholder="Email address"
             required
+            style={{
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "1px solid #cbd5f5",
+              background: "#f8fafc",
+            }}
           />
           <input
             name="name"
-            placeholder="Name"
+            placeholder="Full name"
+            style={{
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "1px solid #cbd5f5",
+              background: "#f8fafc",
+            }}
           />
           <input
             name="password"
             type="password"
-            placeholder="Password"
+            placeholder="Temporary password"
             required
+            style={{
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "1px solid #cbd5f5",
+              background: "#f8fafc",
+            }}
           />
-          <select name="role" defaultValue="USER">
-            <option value="USER">USER</option>
-            <option value="ADMIN">ADMIN</option>
+          <select
+            name="role"
+            defaultValue="USER"
+            style={{
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "1px solid #cbd5f5",
+              background: "#f8fafc",
+            }}
+          >
+            <option value="USER">Standard user</option>
+            <option value="ADMIN">Admin</option>
           </select>
-
-          <button type="submit">Add User</button>
+          <button
+            type="submit"
+            style={{
+              padding: "10px 14px",
+              borderRadius: 10,
+              border: "none",
+              background: "#0f172a",
+              color: "#f8fafc",
+              fontWeight: 600,
+            }}
+          >
+            Create user
+          </button>
         </form>
       </section>
 
-      <table
-      style={{
-        width: "100%",
-        borderCollapse: "collapse",
-        marginTop: 16,
-      }}
+      <section
+        style={{
+          background: "#ffffff",
+          border: "1px solid #e2e8f0",
+          borderRadius: 16,
+          padding: 20,
+          boxShadow: "0 10px 30px -20px rgba(15, 23, 42, 0.35)",
+        }}
       >
-        <thead>
-          <tr>
-            <th align="left">User</th>
-            <th align="left">Role</th>
-            <th align="right">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map((user) => {
-            const nextRole = user.role === "ADMIN" ? "USER" : "ADMIN";
-            return (
-              <tr
-                key={user.id}
-                style={{ borderBottom: "1px solid #e5e7eb" }}
-              >
-                <td>
-                  <div style={{ fontWeight: 500 }}>{user.email}</div>
-                  <div style={{ fontSize: 12, color: "#6b7280" }}>
-                    {user.name ?? "—"}
-                  </div>
-                </td>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 16,
+          }}
+        >
+          <div>
+            <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>
+              Users
+            </h2>
+            <p style={{ fontSize: 13, color: "#64748b" }}>
+              View and manage account access.
+            </p>
+          </div>
+        </div>
 
-                <td>
-                  <span
-                    style={{
-                      padding: "4px 8px",
-                      borderRadius: 999,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      backgroundColor:
-                        user.role === "ADMIN" ? "#fee2e2" : "#e0f2fe",
-                      color:
-                        user.role === "ADMIN" ? "#991b1b" : "#075985",
-                    }}
-                  >
-                    {user.role}
-                  </span>
-                </td>
-                <td align="right">
-                  <details style={{ position: "relative", display: "inline-block" }}>
-                    <summary
-                      style={{
-                        cursor: "pointer",
-                        listStyle: "none",
-                        padding: "6px 10px",
-                        border: "1px solid #d1d5db",
-                        borderRadius: 6,
-                        background: "#f9fafb",
-                        fontSize: 13,
-                        fontWeight: 500,
-                      }}
-                    >
-                      Actions ▾
-                    </summary>
-
-                    {/* Dropdown content */}
-                    <div
-                      style={{
-                        position: "absolute",
-                        right: 0,
-                        marginTop: 6,
-                        minWidth: 220,
-                        background: "#ffffff",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: 8,
-                        padding: 12,
-                        boxShadow:
-                          "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)",
-                        zIndex: 10,
-                      }}
-                    >
-                      {/* Promote / Demote */}
-                      <form action={updateUserRole} style={{ marginBottom: 8 }}>
-                        <input type="hidden" name="userId" value={user.id} />
-                        <input type="hidden" name="role" value={nextRole} />
-
-                        <button
-                          type="submit"
-                          disabled={session.user.id === user.id}
-                          style={{
-                            width: "100%",
-                            padding: "6px 8px",
-                            textAlign: "left",
-                            borderRadius: 6,
-                            border: "none",
-                            background: "transparent",
-                            cursor:
-                              session.user.id === user.id ? "not-allowed" : "pointer",
-                            color:
-                              session.user.id === user.id ? "#9ca3af" : "#111827",
-                          }}
-                        >
-                          {user.role === "ADMIN"
-                            ? "Demote to USER"
-                            : "Promote to ADMIN"}
-                        </button>
-                      </form>
-
-                      <hr style={{ margin: "8px 0" }} />
-
-                      {/* Reset password */}
-                      <form action={resetUserPassword} style={{ marginBottom: 8 }}>
-                        <input type="hidden" name="userId" value={user.id} />
-                        <input
-                          type="password"
-                          name="password"
-                          placeholder="New password"
-                          required
-                          style={{ width: "100%", marginBottom: 6 }}
-                        />
-                        <button type="submit" style={{ width: "100%" }}>
-                          Reset password
-                        </button>
-                      </form>
-
-                      <hr style={{ margin: "8px 0" }} />
-
-                      {/* Delete */}
-                      <form action={deleteUser}>
-                        <input type="hidden" name="userId" value={user.id} />
-                        <label style={{ fontSize: 12 }}>
-                          <input type="checkbox" name="confirm" /> confirm delete
-                        </label>
-                        <button
-                          type="submit"
-                          disabled={session.user.id === user.id}
-                          style={{
-                            marginTop: 6,
-                            width: "100%",
-                            color: "#b91c1c",
-                            cursor:
-                              session.user.id === user.id ? "not-allowed" : "pointer",
-                          }}
-                        >
-                          Delete user
-                        </button>
-                      </form>
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "separate",
+            borderSpacing: "0 10px",
+          }}
+        >
+          <thead>
+            <tr style={{ textTransform: "uppercase", fontSize: 11, color: "#64748b" }}>
+              <th align="left" style={{ paddingLeft: 8 }}>
+                User
+              </th>
+              <th align="left">Role</th>
+              <th align="right" style={{ paddingRight: 8 }}>
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map((user) => {
+              const nextRole = user.role === "ADMIN" ? "USER" : "ADMIN";
+              return (
+                <tr
+                  key={user.id}
+                  style={{
+                    background: "#f8fafc",
+                    borderRadius: 12,
+                  }}
+                >
+                  <td style={{ padding: "14px 8px" }}>
+                    <div style={{ fontWeight: 600 }}>{user.email}</div>
+                    <div style={{ fontSize: 12, color: "#94a3b8" }}>
+                      {user.name ?? "No name on file"}
                     </div>
-                  </details>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </>
+                  </td>
+
+                  <td>
+                    <span
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: 999,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        backgroundColor:
+                          user.role === "ADMIN" ? "#fee2e2" : "#e0f2fe",
+                        color:
+                          user.role === "ADMIN" ? "#991b1b" : "#075985",
+                      }}
+                    >
+                      {user.role === "ADMIN" ? "Admin" : "Standard"}
+                    </span>
+                  </td>
+                  <td align="right" style={{ paddingRight: 8 }}>
+                    <details style={{ position: "relative", display: "inline-block" }}>
+                      <summary
+                        style={{
+                          cursor: "pointer",
+                          listStyle: "none",
+                          padding: "8px 12px",
+                          border: "1px solid #e2e8f0",
+                          borderRadius: 10,
+                          background: "#ffffff",
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: "#0f172a",
+                        }}
+                      >
+                        Manage ▾
+                      </summary>
+
+                      <div
+                        style={{
+                          position: "absolute",
+                          right: 0,
+                          marginTop: 8,
+                          minWidth: 240,
+                          background: "#ffffff",
+                          border: "1px solid #e2e8f0",
+                          borderRadius: 12,
+                          padding: 12,
+                          boxShadow:
+                            "0 20px 30px -20px rgba(15, 23, 42, 0.4)",
+                          zIndex: 10,
+                        }}
+                      >
+                        <form action={updateUserRole} style={{ marginBottom: 12 }}>
+                          <input type="hidden" name="userId" value={user.id} />
+                          <input type="hidden" name="role" value={nextRole} />
+
+                          <button
+                            type="submit"
+                            disabled={session.user.id === user.id}
+                            style={{
+                              width: "100%",
+                              padding: "8px 10px",
+                              textAlign: "left",
+                              borderRadius: 8,
+                              border: "1px solid #e2e8f0",
+                              background: "#f8fafc",
+                              cursor:
+                                session.user.id === user.id
+                                  ? "not-allowed"
+                                  : "pointer",
+                              color:
+                                session.user.id === user.id
+                                  ? "#94a3b8"
+                                  : "#0f172a",
+                              fontWeight: 600,
+                            }}
+                          >
+                            {user.role === "ADMIN"
+                              ? "Demote to standard"
+                              : "Promote to admin"}
+                          </button>
+                        </form>
+
+                        <div style={{ borderTop: "1px solid #e2e8f0", margin: "12px 0" }} />
+
+                        <form action={resetUserPassword} style={{ marginBottom: 12 }}>
+                          <input type="hidden" name="userId" value={user.id} />
+                          <input
+                            type="password"
+                            name="password"
+                            placeholder="New password"
+                            required
+                            style={{
+                              width: "100%",
+                              marginBottom: 8,
+                              padding: "8px 10px",
+                              borderRadius: 8,
+                              border: "1px solid #e2e8f0",
+                              background: "#f8fafc",
+                            }}
+                          />
+                          <button
+                            type="submit"
+                            style={{
+                              width: "100%",
+                              padding: "8px 10px",
+                              borderRadius: 8,
+                              border: "1px solid #e2e8f0",
+                              background: "#ffffff",
+                              fontWeight: 600,
+                              color: "#0f172a",
+                            }}
+                          >
+                            Reset password
+                          </button>
+                        </form>
+
+                        <div style={{ borderTop: "1px solid #e2e8f0", margin: "12px 0" }} />
+
+                        <form action={deleteUser}>
+                          <input type="hidden" name="userId" value={user.id} />
+                          <label
+                            style={{
+                              fontSize: 12,
+                              color: "#64748b",
+                              display: "flex",
+                              gap: 6,
+                              alignItems: "center",
+                            }}
+                          >
+                            <input type="checkbox" name="confirm" /> I understand this
+                            is permanent
+                          </label>
+                          <button
+                            type="submit"
+                            disabled={session.user.id === user.id}
+                            style={{
+                              marginTop: 8,
+                              width: "100%",
+                              padding: "8px 10px",
+                              borderRadius: 8,
+                              border: "1px solid #fecaca",
+                              background: "#fee2e2",
+                              color: "#b91c1c",
+                              fontWeight: 600,
+                              cursor:
+                                session.user.id === user.id
+                                  ? "not-allowed"
+                                  : "pointer",
+                            }}
+                          >
+                            Delete user
+                          </button>
+                        </form>
+                      </div>
+                    </details>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </section>
+    </div>
   );
 }
