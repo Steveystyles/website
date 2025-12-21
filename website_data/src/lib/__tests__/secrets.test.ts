@@ -49,9 +49,8 @@ describe("readSecret", () => {
 
   it("throws when no secret is configured", () => {
     fsMock.existsSync.mockReturnValue(false)
-
     expect(() => readSecret("MISSING_SECRET")).toThrow(
-      "Secret MISSING_SECRET not found",
+      'Secret "MISSING_SECRET" not found in env or /run/secrets',
     )
   })
 })
