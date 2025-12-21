@@ -4,6 +4,16 @@ import Credentials from "next-auth/providers/credentials"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 
+// 🔐 Sanity check — fail fast if NEXTAUTH_SECRET is missing
+if (!process.env.NEXT_RUNTIME || process.env.NEXT_RUNTIME === "nodejs") {
+  try {
+    readSecret("NEXTAUTH_SECRET")
+  } catch (err) {
+    console.error("❌ NEXTAUTH_SECRET is missing or unreadable")
+    throw err
+  }
+}
+
 export const authOptions: NextAuthOptions = {
   secret: readSecret("NEXTAUTH_SECRET"),
   pages: {
