@@ -8,12 +8,21 @@ export default async function AdminLayout({
   await requireAdmin();
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
+    <div
+      style={{
+        display: "flex",
+        minHeight: "100vh",
+        background: "#f8fafc",
+        color: "#0f172a",
+      }}
+    >
       <aside
         style={{
-          width: 240,
-          padding: 20,
-          borderRight: "1px solid #e5e7eb",
+          width: 260,
+          padding: 24,
+          borderRight: "1px solid #e2e8f0",
+          background: "#ffffff",
+          boxShadow: "10px 0 30px -24px rgba(15, 23, 42, 0.35)",
         }}
       >
         <h2>Admin</h2>
