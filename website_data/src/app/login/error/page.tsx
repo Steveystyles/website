@@ -31,18 +31,12 @@ export default function LoginErrorPage() {
             <p className="text-sm text-slate-300">{message}</p>
           </div>
 
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-8">
             <Link
               href="/login"
-              className="flex-1 rounded-xl bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 px-4 py-3 text-center text-base font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110"
+              className="block rounded-xl bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 px-4 py-3 text-center text-base font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:brightness-110"
             >
               Back to login
-            </Link>
-            <Link
-              href="/"
-              className="flex-1 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-center text-base font-semibold text-white/90 transition hover:bg-white/10"
-            >
-              Go home
             </Link>
           </div>
         </div>
