@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth/auth"
 import { redirect } from "next/navigation"
+import HomePage from "@/components/home/HomePage"
 
 export default async function Home() {
   const session = await getServerSession(authOptions)
@@ -9,9 +10,5 @@ export default async function Home() {
     redirect("/login")
   }
 
-  return (
-    <main>
-      <h1>Welcome {session.user?.email}</h1>
-    </main>
-  )
+  return <HomePage userEmail={session.user?.email ?? "User"} />
 }
