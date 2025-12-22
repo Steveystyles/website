@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Skeleton from "../Skeleton"
+import OutputTwoSkeleton from "./OutputTwoSkeleton"
 
 export default function OutputTwo() {
   const [loading, setLoading] = useState(true)
@@ -11,7 +11,7 @@ export default function OutputTwo() {
     return () => clearTimeout(t)
   }, [])
 
-  if (loading) return <Skeleton />
+  if (loading) return <OutputTwoSkeleton />
 
   return (
     <div className="space-y-3">
