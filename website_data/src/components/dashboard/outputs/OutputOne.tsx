@@ -1,13 +1,22 @@
-export default function OutputOne() {
+"use client"
+
+import { useEffect, useState } from "react"
+import Skeleton from "../Skeleton"
+
+export default function OutputTwo() {
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const t = setTimeout(() => setLoading(false), 800)
+    return () => clearTimeout(t)
+  }, [])
+
+  if (loading) return <Skeleton />
+
   return (
     <div className="space-y-3">
-      <h2 className="text-lg font-semibold">Output One</h2>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-lg bg-neutral-800 p-3">Card A</div>
-        <div className="rounded-lg bg-neutral-800 p-3">Card B</div>
-        <div className="rounded-lg bg-neutral-800 p-3">Card C</div>
-        <div className="rounded-lg bg-neutral-800 p-3">Card D</div>
-      </div>
+      <h2 className="text-lg font-semibold">Output Two</h2>
+      <p className="text-sm text-neutral-400">Loaded content</p>
     </div>
   )
 }

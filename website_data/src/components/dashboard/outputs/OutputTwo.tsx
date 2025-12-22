@@ -1,21 +1,31 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import Skeleton from "../Skeleton"
+
 export default function OutputTwo() {
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const t = setTimeout(() => setLoading(false), 800)
+    return () => clearTimeout(t)
+  }, [])
+
+  if (loading) return <Skeleton />
+
   return (
     <div className="space-y-3">
-      <h2 className="text-lg font-semibold">Output Two</h2>
-      <p className="text-sm text-neutral-400">
-        Placeholder content for output two
+      <h2 className="text-base font-semibold text-smfc-white">
+        Output Two
+      </h2>
+
+      <p className="text-xs text-neutral-400">
+        Placeholder data
       </p>
 
-      <ul className="space-y-2">
-        {["Item Alpha", "Item Bravo", "Item Charlie"].map((item) => (
-          <li
-            key={item}
-            className="rounded-lg bg-neutral-800 p-3 text-sm"
-          >
-            {item}
-          </li>
-        ))}
-      </ul>
+      <div className="rounded-lg border border-smfc-grey bg-smfc-black p-3">
+        Item Alpha
+      </div>
     </div>
   )
 }
