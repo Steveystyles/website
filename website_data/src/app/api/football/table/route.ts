@@ -1,5 +1,3 @@
-import { prisma } from "@/lib/prisma"
-
 type LeagueRow = {
   position: number
   teamId: string
@@ -11,53 +9,98 @@ type LeagueRow = {
   crest: string
 }
 
+type SportsDbTableRow = {
+  intRank?: string | number
+  idTeam?: string | number
+  strTeam?: string
+  intWin?: string | number
+  intLoss?: string | number
+  intGoalDifference?: string | number
+  intPoints?: string | number
+  strTeamBadge?: string
+  strLeague?: string
+}
+
+async function fetchTable(
+  apiKey: string,
+  leagueId: string,
+  season: string
+): Promise<{ rows: LeagueRow[]; leagueName: string }> {
+  try {
+    const res = await fetch(
+      `https://www.thesportsdb.com/api/v1/json/${apiKey}/lookuptable.php?l=${leagueId}&s=${season}`,
+      { cache: "no-store" }
+    )
+
+    if (!res.ok) return { rows: [], leagueName: "" }
+
+    const json = await res.json()
+    const table = json?.table as SportsDbTableRow[] | undefined
+
+    if (!Array.isArray(table) || table.length === 0) {
+      return { rows: [], leagueName: "" }
+    }
+
+    const rows: LeagueRow[] = table
+      .map((r) => ({
+        position: Number(r.intRank ?? 0),
+        teamId: String(r.idTeam ?? ""),
+        teamName: r.strTeam ?? "",
+        won: Number(r.intWin ?? 0),
+        lost: Number(r.intLoss ?? 0),
+        goalDifference: Number(r.intGoalDifference ?? 0),
+        points: Number(r.intPoints ?? 0),
+        crest: r.strTeamBadge ?? "",
+      }))
+      // TheSportsDB occasionally returns rows out of order; enforce the correct ordering
+      // so the UI grid is consistent with the official table.
+      .sort((a, b) => a.position - b.position)
+
+    const leagueName = table[0]?.strLeague ?? ""
+    return { rows, leagueName }
+  } catch (error) {
+    console.error("Failed to fetch table from TheSportsDB", error)
+    return { rows: [], leagueName: "" }
+  }
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const leagueId = searchParams.get("leagueId")
   const season = searchParams.get("season")
 
-  // Use the supplied API key when available – TheSportsDB test key ("3")
-  // only returns a subset of results which caused incomplete tables.
-  const apiKey = process.env.THESPORTSDB_API_KEY ?? "123"
-
   if (!leagueId || !season) {
     return Response.json({ rows: [], leagueName: "" }, { status: 400 })
   }
 
-  // optional: keep your existing LeagueStandings cache model, but it must be string/string
-  // If your schema is number/number right now, we’ll fix it in the next step.
-  // For now: NO CACHE (to get it working first)
+  const suppliedKey = process.env.THESPORTSDB_API_KEY?.trim() || ""
+  const defaultKey = "123"
+  const fallbackKey = suppliedKey === "3" ? defaultKey : "3"
 
-  const res = await fetch(
-    `https://www.thesportsdb.com/api/v1/json/${apiKey}/lookuptable.php?l=${leagueId}&s=${season}`,
-    { cache: "no-store" }
-  )
+  const primaryKey = suppliedKey || defaultKey
+  let best = await fetchTable(primaryKey, leagueId, season)
 
-  if (!res.ok) return Response.json({ rows: [], leagueName: "" })
+  const needsMoreRows =
+    best.rows.length === 0 || best.rows.length < 8
 
-  const json = await res.json()
-  const table = json?.table
-
-  if (!Array.isArray(table) || table.length === 0) {
-    return Response.json({ rows: [], leagueName: "" })
+  if (needsMoreRows && primaryKey !== defaultKey) {
+    const secondary = await fetchTable(defaultKey, leagueId, season)
+    if (secondary.rows.length > best.rows.length) {
+      best = secondary
+    }
   }
 
-  const rows: LeagueRow[] = table
-    .map((r: any) => ({
-      position: Number(r.intRank),
-      teamId: String(r.idTeam),
-      teamName: r.strTeam,
-      won: Number(r.intWin),
-      lost: Number(r.intLoss),
-      goalDifference: Number(r.intGoalDifference),
-      points: Number(r.intPoints),
-      crest: r.strTeamBadge,
-    }))
-    // TheSportsDB occasionally returns rows out of order; enforce the correct ordering
-    // so the UI grid is consistent with the official table.
-    .sort((a, b) => a.position - b.position)
+  const stillLight =
+    (best.rows.length === 0 || best.rows.length < 8) &&
+    fallbackKey &&
+    ![primaryKey, defaultKey].includes(fallbackKey)
 
-  const leagueName = table[0]?.strLeague ?? ""
+  if (stillLight) {
+    const tertiary = await fetchTable(fallbackKey, leagueId, season)
+    if (tertiary.rows.length > best.rows.length) {
+      best = tertiary
+    }
+  }
 
-  return Response.json({ rows, leagueName })
+  return Response.json(best)
 }
