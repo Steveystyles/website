@@ -1,9 +1,7 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "debian-openssl-1.1.x", "linux-musl-openssl-3.0.x"]
 }
-
-
 
 datasource db {
   provider = "postgresql"
@@ -33,3 +31,19 @@ enum Role {
   USER
   ADMIN
 }
+
+model FootballLeague {
+  id        String   @id         // TheSportsDB idLeague
+  name      String
+  sport     String
+  country   String?
+  source    String              // "thesportsdb"
+  updatedAt DateTime @updatedAt
+}
+
+model FootballMeta {
+  key       String   @id         // e.g. "thesportsdb_leagues_hash"
+  value     String
+  updatedAt DateTime @updatedAt
+}
+

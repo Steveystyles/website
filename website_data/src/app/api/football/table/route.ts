@@ -1,64 +1,55 @@
-import { NextResponse } from "next/server"
+import { prisma } from "@/lib/prisma"
 
-const LEAGUE_IDS: Record<string, string> = {
-  "scottish-premiership": "179",
-  "scottish-championship": "180",
+type LeagueRow = {
+  position: number
+  teamId: string
+  teamName: string
+  won: number
+  lost: number
+  goalDifference: number
+  points: number
+  crest: string
 }
 
 export async function GET(req: Request) {
-  try {
-    const { searchParams } = new URL(req.url)
-    const league = searchParams.get("league") ?? "scottish-premiership"
-    const season = searchParams.get("season") ?? "2024"
+  const { searchParams } = new URL(req.url)
+  const leagueId = searchParams.get("leagueId")
+  const season = searchParams.get("season")
 
-    const leagueId = LEAGUE_IDS[league]
-
-    if (!leagueId) {
-      return NextResponse.json({ rows: [] })
-    }
-
-    if (!process.env.API_FOOTBALL_KEY) {
-      throw new Error("Missing API_FOOTBALL_KEY")
-    }
-
-    const res = await fetch(
-      `https://v3.football.api-sports.io/standings?league=${leagueId}&season=${season}`,
-      {
-        headers: {
-          "x-apisports-key": process.env.API_FOOTBALL_KEY,
-        },
-      }
-    )
-
-    const json = await res.json()
-
-    if (!json?.response || json.response.length === 0) {
-      return NextResponse.json({
-        leagueName: "Scottish Premiership",
-        rows: [],
-      })
-    }
-
-    const standings =
-      json?.response?.[0]?.league?.standings?.[0] ?? []
-
-    const rows = standings.map((row: any) => ({
-      position: row.rank,
-      teamId: row.team.id.toString(),
-      teamName: row.team.name,
-      won: row.all.win,
-      lost: row.all.lose,
-      goalDifference: row.goalsDiff,
-      points: row.points,
-      crest: row.team.logo,
-    }))
-
-    return NextResponse.json({
-      leagueName: json.response?.[0]?.league?.name ?? "",
-      rows,
-    })
-  } catch (err) {
-    console.error("League table error:", err)
-    return NextResponse.json({ rows: [] }, { status: 500 })
+  if (!leagueId || !season) {
+    return Response.json({ rows: [], leagueName: "" }, { status: 400 })
   }
+
+  // optional: keep your existing LeagueStandings cache model, but it must be string/string
+  // If your schema is number/number right now, we’ll fix it in the next step.
+  // For now: NO CACHE (to get it working first)
+
+  const res = await fetch(
+    `https://www.thesportsdb.com/api/v1/json/3/lookuptable.php?l=${leagueId}&s=${season}`,
+    { cache: "no-store" }
+  )
+
+  if (!res.ok) return Response.json({ rows: [], leagueName: "" })
+
+  const json = await res.json()
+  const table = json?.table
+
+  if (!Array.isArray(table) || table.length === 0) {
+    return Response.json({ rows: [], leagueName: "" })
+  }
+
+  const rows: LeagueRow[] = table.map((r: any) => ({
+    position: Number(r.intRank),
+    teamId: String(r.idTeam),
+    teamName: r.strTeam,
+    won: Number(r.intWin),
+    lost: Number(r.intLoss),
+    goalDifference: Number(r.intGoalDifference),
+    points: Number(r.intPoints),
+    crest: r.strTeamBadge,
+  }))
+
+  const leagueName = table[0]?.strLeague ?? ""
+
+  return Response.json({ rows, leagueName })
 }

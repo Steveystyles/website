@@ -1,5 +1,7 @@
 "use client"
 
+import { useEffect, useState } from "react"
+
 type League = {
   id: string
   name: string
@@ -7,24 +9,36 @@ type League = {
 }
 
 type Props = {
-  value: string
-  onChange: (leagueId: string, season: string) => void
+  onChange: (leagueId: string, season: string, leagueName: string) => void
 }
 
-const LEAGUES: League[] = [
-  {
-    id: "4328",
-    name: "Scottish Premiership",
-    season: "2024-2025",
-  },
-  {
-    id: "4329",
-    name: "Scottish Championship",
-    season: "2024-2025",
-  },
-]
+export default function LeagueSelector({ onChange }: Props) {
+  const [leagues, setLeagues] = useState<League[]>([])
+  const [leagueId, setLeagueId] = useState("")
 
-export default function LeagueSelector({ value, onChange }: Props) {
+  useEffect(() => {
+    fetch("/api/football/leagues")
+      .then(async (r) => {
+        const text = await r.text()
+        return text ? JSON.parse(text) : []
+      })
+      .then((data: League[]) => {
+        setLeagues(data)
+
+        // 🇸🇨 Auto-select Scottish league
+        const scottish =
+          data.find((l) =>
+            l.name.toLowerCase().includes("scottish")
+          ) ?? data[0]
+
+        if (scottish) {
+          setLeagueId(scottish.id)
+          onChange(scottish.id, scottish.season, scottish.name)
+        }
+      })
+      .catch(() => setLeagues([]))
+  }, [onChange])
+
   return (
     <div className="rounded-xl border border-smfc-grey bg-smfc-charcoal p-4 shadow-lg shadow-black/30">
       <label className="block text-sm font-semibold text-neutral-300 mb-2">
@@ -32,16 +46,25 @@ export default function LeagueSelector({ value, onChange }: Props) {
       </label>
 
       <select
-        value={value}
+        value={leagueId}
         onChange={(e) => {
-          const league = LEAGUES.find((l) => l.id === e.target.value)
-          if (league) onChange(league.id, league.season)
+          const league = leagues.find(
+            (l) => l.id === e.target.value
+          )
+          if (league) {
+            setLeagueId(league.id)
+            onChange(
+              league.id,
+              league.season,
+              league.name
+            )
+          }
         }}
         className="w-full rounded-lg bg-smfc-black border border-smfc-grey p-2 text-smfc-white"
       >
-        {LEAGUES.map((league) => (
-          <option key={league.id} value={league.id}>
-            {league.name}
+        {leagues.map((l) => (
+          <option key={l.id} value={l.id}>
+            {l.name}
           </option>
         ))}
       </select>

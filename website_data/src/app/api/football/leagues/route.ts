@@ -1,14 +1,16 @@
-import { NextResponse } from "next/server"
+import { prisma } from "@/lib/prisma"
 
 export async function GET() {
-  return NextResponse.json([
-    {
-      id: "scot-prem",
-      name: "Scottish Premiership",
-    },
-    {
-      id: "scot-champ",
-      name: "Scottish Championship",
-    },
-  ])
+  const leagues = await prisma.footballLeague.findMany({
+    where: { source: "thesportsdb" },
+    orderBy: { name: "asc" },
+  })
+
+  return Response.json(
+    leagues.map((l) => ({
+      id: l.id,
+      name: l.name,
+      season: "2024-2025",
+    }))
+  )
 }
