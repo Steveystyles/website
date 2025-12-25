@@ -8,6 +8,13 @@ function sha256(input: string) {
   return crypto.createHash("sha256").update(input).digest("hex")
 }
 
+type SportsDbLeague = {
+  idLeague?: string | number
+  strLeague?: string | null
+  strSport?: string | null
+  strCountry?: string | null
+}
+
 async function main() {
   const res = await fetch(URL)
   if (!res.ok) throw new Error(`Fetch failed: ${res.status}`)
@@ -25,10 +32,9 @@ async function main() {
     return
   }
 
-  const json = JSON.parse(raw)
-  const leagues = (json.leagues ?? []).filter(
-    (l: any) => l.strSport === "Soccer"
-  )
+  const json = JSON.parse(raw) as { leagues?: SportsDbLeague[] }
+  const leagues =
+    json.leagues?.filter((league) => league.strSport === "Soccer") ?? []
 
   // Replace existing list
   await prisma.$transaction(async (tx) => {
@@ -37,13 +43,15 @@ async function main() {
     })
 
     await tx.footballLeague.createMany({
-      data: leagues.map((l: any) => ({
-        id: String(l.idLeague),
-        name: String(l.strLeague),
-        sport: String(l.strSport),
-        country: l.strCountry ? String(l.strCountry) : null,
-        source: "thesportsdb",
-      })),
+      data: leagues
+        .map((league) => ({
+          id: String(league.idLeague ?? ""),
+          name: league.strLeague ? String(league.strLeague) : "",
+          sport: league.strSport ? String(league.strSport) : "Soccer",
+          country: league.strCountry ? String(league.strCountry) : null,
+          source: "thesportsdb",
+        }))
+        .filter((league) => league.id && league.name),
     })
 
     await tx.footballMeta.upsert({

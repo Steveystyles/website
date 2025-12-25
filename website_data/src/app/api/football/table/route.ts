@@ -84,7 +84,7 @@ export async function GET(req: Request) {
   const keys = [defaultKey, suppliedKey, fallbackKey]
   const seen = new Set<string>()
 
-  let best = { rows: [], leagueName: "" }
+  let best: { rows: LeagueRow[]; leagueName: string } = { rows: [], leagueName: "" }
   let bestKey = ""
 
   for (const key of keys) {

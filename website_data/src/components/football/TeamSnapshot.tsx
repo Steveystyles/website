@@ -1,11 +1,13 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import Image from "next/image"
+import { useEffect, useMemo, useState } from "react"
 
 type TeamDetails = {
   teamName: string
   manager: string
   leaguePosition: number
+  crest?: string | null
   nextMatch: {
     opponent: string
     date: string
@@ -13,19 +15,44 @@ type TeamDetails = {
   }
 }
 
-export default function TeamSnapshot({ teamId }: { teamId: string }) {
+type Props = {
+  teamId: string
+  leagueId: string
+  season: string
+  fallbackTeamName?: string
+  fallbackPosition?: number
+}
+
+export default function TeamSnapshot({
+  teamId,
+  leagueId,
+  season,
+  fallbackPosition,
+  fallbackTeamName,
+}: Props) {
   const [data, setData] = useState<TeamDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showCrest, setShowCrest] = useState(true)
+
+  const search = useMemo(() => {
+    const params = new URLSearchParams({ teamId })
+    if (leagueId) params.set("leagueId", leagueId)
+    if (season) params.set("season", season)
+    return params.toString()
+  }, [leagueId, season, teamId])
 
   useEffect(() => {
+    if (!teamId) return
+
     const controller = new AbortController()
     setLoading(true)
     setError(null)
+    setShowCrest(true)
 
     ;(async () => {
       try {
-        const res = await fetch(`/api/football/team-details?teamId=${teamId}`, {
+        const res = await fetch(`/api/football/team-details?${search}`, {
           signal: controller.signal,
         })
 
@@ -37,19 +64,17 @@ export default function TeamSnapshot({ teamId }: { teamId: string }) {
 
         const json = (await res.json()) as TeamDetails
         setData(json)
-      } catch (e: any) {
-        // ✅ Ignore abort noise (common on fast changes / dev mode)
-        if (e?.name === "AbortError") return
+      } catch (error: unknown) {
+        if (error instanceof DOMException && error.name === "AbortError") return
         setError("Failed to load team data")
         setData(null)
       } finally {
-        // ✅ Don’t update state if aborted
         if (!controller.signal.aborted) setLoading(false)
       }
     })()
 
     return () => controller.abort()
-  }, [teamId])
+  }, [search, teamId])
 
   if (loading) {
     return (
@@ -67,56 +92,62 @@ export default function TeamSnapshot({ teamId }: { teamId: string }) {
     )
   }
 
-  const prettyDate = new Date(data.nextMatch.date).toLocaleDateString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  })
+  const prettyDate = data.nextMatch?.date
+    ? new Date(data.nextMatch.date).toLocaleDateString("en-GB", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+      })
+    : "Date TBC"
+  const hasLeaguePosition = Number.isFinite(data.leaguePosition) && data.leaguePosition > 0
 
   return (
     <div className="rounded-xl border border-smfc-grey bg-smfc-black shadow-lg shadow-black/30 overflow-hidden">
+      {/* Header */}
+      <div className="relative bg-smfc-charcoal px-4 py-3 flex items-center gap-3">
+        <div className="absolute left-0 top-0 h-[3px] w-full bg-smfc-red" />
 
-    {/* Header */}
-    <div className="relative bg-smfc-charcoal px-4 py-3 flex items-center gap-3">
-      <div className="absolute left-0 top-0 h-[3px] w-full bg-smfc-red" />
+        {/* Team crest */}
+        {showCrest && (
+          <Image
+            src={data.crest || `/teams/${teamId}.svg`}
+            alt={`${data.teamName} crest`}
+            width={28}
+            height={28}
+            className="h-7 w-7 rounded-full bg-smfc-black object-contain"
+            onError={() => setShowCrest(false)}
+            priority
+          />
+        )}
 
-      {/* Team crest */}
-      <img
-        src={`/teams/${teamId}.svg`}
-        alt=""
-        className="h-7 w-7"
-        onError={(e) => {
-          ;(e.currentTarget as HTMLImageElement).style.display = "none"
-        }}
-      />
+        <h3 className="text-lg font-bold tracking-wide text-smfc-white">
+          {data.teamName || fallbackTeamName}
+        </h3>
+      </div>
+      {/* Body */}
+      <div className="p-4 space-y-2">
+        <div className="text-sm text-neutral-300">
+          <span className="font-semibold text-smfc-white">Manager:</span>{" "}
+          {data.manager || "Unavailable"}
+        </div>
 
-      <h3 className="text-lg font-bold tracking-wide text-smfc-white">
-        {data.teamName}
-      </h3>
+        <div className="text-sm text-neutral-300">
+          <span className="font-semibold text-smfc-white">League position:</span>{" "}
+          {hasLeaguePosition
+            ? data.leaguePosition
+            : fallbackPosition ?? "—"}
+        </div>
+
+        <div className="text-sm text-neutral-300">
+          <span className="font-semibold text-smfc-white">Next match:</span>{" "}
+          {data.nextMatch.homeAway === "H" ? "Home vs" : "Away at"}{" "}
+          {data.nextMatch.opponent}
+        </div>
+
+        <div className="text-xs text-neutral-400">
+          {prettyDate}
+        </div>
+      </div>
     </div>
-    {/* Body */}
-    <div className="p-4 space-y-2">
-      
-      <div className="text-sm text-neutral-300">
-        <span className="font-semibold text-smfc-white">Manager:</span>{" "}
-        {data.manager}
-      </div>
-
-      <div className="text-sm text-neutral-300">
-        <span className="font-semibold text-smfc-white">League position:</span>{" "}
-        {data.leaguePosition}
-      </div>
-
-      <div className="text-sm text-neutral-300">
-        <span className="font-semibold text-smfc-white">Next match:</span>{" "}
-        {data.nextMatch.homeAway === "H" ? "Home vs" : "Away at"}{" "}
-        {data.nextMatch.opponent}
-      </div>
-
-      <div className="text-xs text-neutral-400">
-        {prettyDate}
-      </div>
-    </div>
-  </div>
   )
 }

@@ -1,5 +1,7 @@
 "use client"
 
+import Image from "next/image"
+
 type LeagueRow = {
   position: number
   teamId: string
@@ -65,9 +67,11 @@ export default function LeagueTable({
                     {row.position}
                   </span>
 
-                  <img
-                    src={row.crest}
+                  <Image
+                    src={row.crest || "/crest.svg"}
                     alt={`${row.teamName} badge`}
+                    width={40}
+                    height={40}
                     className="h-10 w-10 shrink-0 rounded-full bg-smfc-black object-contain"
                     loading="lazy"
                   />

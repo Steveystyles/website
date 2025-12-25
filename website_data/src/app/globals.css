@@ -4,6 +4,8 @@
   --background: #ffffff;
   --foreground: #171717;
   --bottom-nav-height: 64px;
+  --font-geist-sans: "Inter", "Segoe UI", -apple-system, system-ui, sans-serif;
+  --font-geist-mono: "SFMono-Regular", ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 @theme inline {
@@ -98,4 +100,3 @@ body {
     animation: none;
   }
 }
-

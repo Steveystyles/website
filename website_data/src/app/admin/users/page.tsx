@@ -14,7 +14,7 @@ import {
 
 
 export async function createUser(formData: FormData) {
-  const session = await requireAdmin();
+  await requireAdmin();
 
   const email = formData.get("email") as string;
   const name = formData.get("name") as string | null;
@@ -102,7 +102,7 @@ export async function updateUserRole(formData: FormData) {
 }
 
 export async function resetUserPassword(formData: FormData) {
-  const session = await requireAdmin();
+  await requireAdmin();
 
   const userId = formData.get("userId") as string;
   const newPassword = formData.get("password") as string;
