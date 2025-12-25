@@ -29,11 +29,13 @@ export default function FootballExplorer() {
   const detailsRef = useRef<HTMLDivElement | null>(null)
   const handleLeagueChange = useCallback(
     (id: string, nextSeason: string, name: string) => {
+      setLoading(true)
+      setError(null)
+      setRows([])
       setLeagueId(id)
       setSeason(nextSeason)
       setLeagueName(name)
       setTeamId("") // reset before auto-select
-      setError(null)
     },
     []
   )
@@ -43,8 +45,6 @@ export default function FootballExplorer() {
     if (!leagueId || !season) return
 
     let alive = true
-    setLoading(true)
-    setError(null)
 
     fetch(`/api/football/table?leagueId=${leagueId}&season=${season}`)
       .then(async (r) => {
@@ -96,6 +96,8 @@ export default function FootballExplorer() {
     }
   }, [teamId])
 
+  const selectedRow = rows.find((row) => row.teamId === teamId)
+
   return (
     <section className="space-y-5">
       <LeagueSelector
@@ -122,7 +124,13 @@ export default function FootballExplorer() {
       <div ref={detailsRef} className="space-y-4">
         {teamId ? (
           <>
-            <TeamSnapshot teamId={teamId} />
+            <TeamSnapshot
+              teamId={teamId}
+              leagueId={leagueId}
+              season={season}
+              fallbackPosition={selectedRow?.position}
+              fallbackTeamName={selectedRow?.teamName ?? leagueName}
+            />
             <OnThisDay teamId={teamId} />
           </>
         ) : (
