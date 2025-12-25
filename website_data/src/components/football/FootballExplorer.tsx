@@ -1,11 +1,10 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import LeagueTable from "./LeagueTable"
 import TeamSnapshot from "./TeamSnapshot"
 import OnThisDay from "./OnThisDay"
 import LeagueSelector from "./LeagueSelector"
-
 
 type LeagueRow = {
   position: number
@@ -15,107 +14,111 @@ type LeagueRow = {
   lost: number
   goalDifference: number
   points: number
-  crest: string // ✅ ADD THIS
-}
-
-const LEAGUE_SLUGS: Record<string, string> = {
-  "4328": "scottish-premiership",
-  "4329": "scottish-championship",
+  crest: string
 }
 
 export default function FootballExplorer() {
   const [rows, setRows] = useState<LeagueRow[]>([])
   const [leagueName, setLeagueName] = useState("")
-  const [teamId, setTeamId] = useState<string>("")
-  const [loading, setLoading] = useState(true)
-  const [leagueId, setLeagueId] = useState("4328")
-  const [season, setSeason] = useState("2023")
+  const [leagueId, setLeagueId] = useState("")
+  const [season, setSeason] = useState("")
+  const [teamId, setTeamId] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const detailsRef = useRef<HTMLDivElement | null>(null)
+  const handleLeagueChange = useCallback(
+    (id: string, nextSeason: string, name: string) => {
+      setLeagueId(id)
+      setSeason(nextSeason)
+      setLeagueName(name)
+      setTeamId("") // reset before auto-select
+      setError(null)
+    },
+    []
+  )
 
+  // 🔁 Fetch league table
   useEffect(() => {
+    if (!leagueId || !season) return
+
     let alive = true
-
     setLoading(true)
-    setTeamId("")
+    setError(null)
 
-    const leagueSlug = LEAGUE_SLUGS[leagueId]
-
-    fetch(`/api/football/table?league=${leagueSlug}&season=${season}`)
+    fetch(`/api/football/table?leagueId=${leagueId}&season=${season}`)
       .then(async (r) => {
-        if (!r.ok) {
-          throw new Error(`HTTP ${r.status}`)
-        }
-
-        const text = await r.text()
-        return text ? JSON.parse(text) : { rows: [], leagueName: "" }
+        if (!r.ok) throw new Error("Failed to load league table")
+        return r.json()
       })
       .then((data) => {
         if (!alive) return
-        setRows(data.rows ?? [])
-        setLeagueName(data.leagueName ?? "")
+
+        const nextRows = data.rows ?? []
+        setRows(nextRows)
+        setLeagueName((prev) => data.leagueName ?? prev ?? "")
+
+        if (nextRows.length === 0) {
+          setError("League table is currently unavailable")
+          setTeamId("")
+          return
+        }
+
+        // 🔴 Auto-select St Mirren
+        const stMirren = nextRows.find((r: LeagueRow) =>
+          r.teamName.toLowerCase().includes("st mirren")
+        )
+
+        if (stMirren) {
+          setTeamId(stMirren.teamId)
+        }
       })
-      .catch((err) => {
-        console.error("League table fetch failed:", err)
+      .catch(() => {
         if (!alive) return
         setRows([])
-        setLeagueName("")
+        setTeamId("")
+        setError("Unable to load league table")
       })
-      .finally(() => {
-        if (alive) setLoading(false)
-      })
+      .finally(() => alive && setLoading(false))
 
     return () => {
       alive = false
     }
   }, [leagueId, season])
 
-
-
-
-  // Auto-scroll when a team is selected
+  // Auto-scroll to details
   useEffect(() => {
-    if (!teamId) return
-    detailsRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    })
+    if (teamId) {
+      detailsRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      })
+    }
   }, [teamId])
 
   return (
     <section className="space-y-5">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <img src="/crest.svg" alt="" className="h-8 w-8 opacity-90" />
-        <div>
-          <h2 className="text-lg font-bold tracking-wide text-smfc-white">
-            Football Explorer
-          </h2>
-          <p className="text-xs text-neutral-400">
-            Live Scottish Premiership table
-          </p>
-        </div>
-      </div>
       <LeagueSelector
-        value={leagueId}
-        onChange={(id, season) => {
-          setLeagueId(id)
-          setSeason(season)
-        }}
+        onChange={handleLeagueChange}
       />
-      {/* League table */}
+
       {loading ? (
-        <div className="text-sm text-neutral-400">Loading league table…</div>
-      ) : (
+        <div className="text-sm text-neutral-400">
+          Loading league table…
+        </div>
+      ) : rows.length > 0 ? (
         <LeagueTable
           leagueName={leagueName}
           rows={rows}
           selectedTeamId={teamId}
           onSelectTeam={setTeamId}
         />
+      ) : (
+        <div className="rounded-xl border border-smfc-grey bg-smfc-charcoal px-4 py-3 text-sm text-neutral-300">
+          {error ?? "Select a league to view standings"}
+        </div>
       )}
 
-      {/* Detail cards */}
       <div ref={detailsRef} className="space-y-4">
         {teamId ? (
           <>
@@ -124,7 +127,7 @@ export default function FootballExplorer() {
           </>
         ) : (
           <div className="text-sm text-neutral-400 italic">
-            Tap a team in the table to view details
+            Select a team to view details
           </div>
         )}
       </div>

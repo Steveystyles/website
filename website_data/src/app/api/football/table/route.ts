@@ -1,64 +1,107 @@
-import { NextResponse } from "next/server"
+type LeagueRow = {
+  position: number
+  teamId: string
+  teamName: string
+  won: number
+  lost: number
+  goalDifference: number
+  points: number
+  crest: string
+}
 
-const LEAGUE_IDS: Record<string, string> = {
-  "scottish-premiership": "179",
-  "scottish-championship": "180",
+type SportsDbTableRow = {
+  intRank?: string | number
+  idTeam?: string | number
+  strTeam?: string
+  intWin?: string | number
+  intLoss?: string | number
+  intGoalDifference?: string | number
+  intPoints?: string | number
+  strTeamBadge?: string
+  strBadge?: string
+  strLeague?: string
+}
+
+async function fetchTable(
+  apiKey: string,
+  leagueId: string,
+  season: string
+): Promise<{ rows: LeagueRow[]; leagueName: string }> {
+  try {
+    const res = await fetch(
+      `https://www.thesportsdb.com/api/v1/json/${apiKey}/lookuptable.php?l=${leagueId}&s=${season}`,
+      { cache: "no-store" }
+    )
+
+    if (!res.ok) return { rows: [], leagueName: "" }
+
+    const json = await res.json()
+    const table = json?.table as SportsDbTableRow[] | undefined
+
+    if (!Array.isArray(table) || table.length === 0) {
+      return { rows: [], leagueName: "" }
+    }
+
+    const rows: LeagueRow[] = table
+      .map((r) => ({
+        position: Number(r.intRank ?? 0),
+        teamId: String(r.idTeam ?? ""),
+        teamName: r.strTeam ?? "",
+        won: Number(r.intWin ?? 0),
+        lost: Number(r.intLoss ?? 0),
+        goalDifference: Number(r.intGoalDifference ?? 0),
+        points: Number(r.intPoints ?? 0),
+        crest: (r.strTeamBadge ?? r.strBadge ?? "").replace(
+          /^http:\/\//,
+          "https://"
+        ),
+      }))
+      // TheSportsDB occasionally returns rows out of order; enforce the correct ordering
+      // so the UI grid is consistent with the official table.
+      .sort((a, b) => a.position - b.position)
+
+    const leagueName = table[0]?.strLeague ?? ""
+    return { rows, leagueName }
+  } catch (error) {
+    console.error("Failed to fetch table from TheSportsDB", error)
+    return { rows: [], leagueName: "" }
+  }
 }
 
 export async function GET(req: Request) {
-  try {
-    const { searchParams } = new URL(req.url)
-    const league = searchParams.get("league") ?? "scottish-premiership"
-    const season = searchParams.get("season") ?? "2024"
+  const { searchParams } = new URL(req.url)
+  const leagueId = searchParams.get("leagueId")
+  const season = searchParams.get("season")
 
-    const leagueId = LEAGUE_IDS[league]
-
-    if (!leagueId) {
-      return NextResponse.json({ rows: [] })
-    }
-
-    if (!process.env.API_FOOTBALL_KEY) {
-      throw new Error("Missing API_FOOTBALL_KEY")
-    }
-
-    const res = await fetch(
-      `https://v3.football.api-sports.io/standings?league=${leagueId}&season=${season}`,
-      {
-        headers: {
-          "x-apisports-key": process.env.API_FOOTBALL_KEY,
-        },
-      }
-    )
-
-    const json = await res.json()
-
-    if (!json?.response || json.response.length === 0) {
-      return NextResponse.json({
-        leagueName: "Scottish Premiership",
-        rows: [],
-      })
-    }
-
-    const standings =
-      json?.response?.[0]?.league?.standings?.[0] ?? []
-
-    const rows = standings.map((row: any) => ({
-      position: row.rank,
-      teamId: row.team.id.toString(),
-      teamName: row.team.name,
-      won: row.all.win,
-      lost: row.all.lose,
-      goalDifference: row.goalsDiff,
-      points: row.points,
-      crest: row.team.logo,
-    }))
-
-    return NextResponse.json({
-      leagueName: json.response?.[0]?.league?.name ?? "",
-      rows,
-    })
-  } catch (err) {
-    console.error("League table error:", err)
-    return NextResponse.json({ rows: [] }, { status: 500 })
+  if (!leagueId || !season) {
+    return Response.json({ rows: [], leagueName: "" }, { status: 400 })
   }
+
+  const suppliedKey = process.env.THESPORTSDB_API_KEY?.trim() || ""
+  const defaultKey = "123"
+  const fallbackKey = "3"
+
+  const keys = [defaultKey, suppliedKey, fallbackKey]
+  const seen = new Set<string>()
+
+  let best = { rows: [], leagueName: "" }
+  let bestKey = ""
+
+  for (const key of keys) {
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+
+    const result = await fetchTable(key, leagueId, season)
+
+    const hasMoreRows = result.rows.length > best.rows.length
+    const prefersDefault =
+      result.rows.length === best.rows.length && key === defaultKey && bestKey !== defaultKey
+
+    if (hasMoreRows || prefersDefault) {
+      best = result
+      bestKey = key
+    }
+  }
+
+  return Response.json(best)
 }

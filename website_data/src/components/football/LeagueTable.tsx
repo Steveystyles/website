@@ -25,17 +25,22 @@ export default function LeagueTable({
   onSelectTeam,
 }: Props) {
   return (
-    <div className="rounded-xl border border-smfc-grey bg-smfc-black shadow-lg shadow-black/30 overflow-hidden">
-      {/* Header */}
-      <div className="relative bg-smfc-charcoal px-4 py-3">
-        <div className="absolute left-0 top-0 h-[3px] w-full bg-smfc-red" />
-        <h3 className="text-lg font-bold tracking-wide text-smfc-white">
-          {leagueName} Table
-        </h3>
+    <div className="overflow-hidden rounded-2xl border border-smfc-grey/70 bg-smfc-black shadow-lg shadow-black/30">
+      <div className="flex flex-col gap-1 border-b border-smfc-grey/60 bg-smfc-charcoal/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.16em] text-smfc-red">
+            Standings
+          </p>
+          <h3 className="text-lg font-bold tracking-wide text-smfc-white">
+            {leagueName} Table
+          </h3>
+        </div>
+        <p className="text-xs text-neutral-400 sm:text-right">
+          Tap a row to see the full team snapshot
+        </p>
       </div>
 
-      {/* Rows */}
-      <div className="divide-y divide-smfc-grey">
+      <div className="divide-y divide-smfc-grey/40 overflow-y-auto max-h-[70vh]">
         {rows.map((row) => {
           const isActive = row.teamId === selectedTeamId
 
@@ -45,49 +50,77 @@ export default function LeagueTable({
               type="button"
               onClick={() => onSelectTeam(row.teamId)}
               className={`
-                w-full text-left px-4 py-3
-                flex flex-col gap-1
-                transition-colors duration-150
+                w-full px-4 py-4 sm:px-5
+                transition-colors duration-150 text-center
                 ${isActive
-                  ? "bg-smfc-charcoal"
+                  ? "bg-smfc-charcoal/80 ring-1 ring-inset ring-smfc-red/60"
                   : "hover:bg-smfc-charcoal/60"}
               `}
             >
-              {/* Top line */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="w-5 text-sm text-neutral-400">
+              <div className="flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4">
+                <div className="flex items-center justify-center gap-3 sm:min-w-0">
+                  <span
+                    className={`flex h-10 w-10 items-center justify-center rounded-xl border bg-smfc-black text-sm font-bold text-neutral-100 ${isActive ? "border-smfc-red/80 text-smfc-white" : "border-smfc-grey/70"}`}
+                  >
                     {row.position}
                   </span>
+
                   <img
                     src={row.crest}
-                    alt=""
-                    className="h-5 w-5"
+                    alt={`${row.teamName} badge`}
+                    className="h-10 w-10 shrink-0 rounded-full bg-smfc-black object-contain"
                     loading="lazy"
                   />
-                  <span className="truncate font-semibold text-smfc-white">
-                    {row.teamName}
-                  </span>
+
+                  <div className="min-w-0 text-left sm:text-center">
+                    <p className="truncate text-base font-semibold text-smfc-white">
+                      {row.teamName}
+                    </p>
+                  </div>
                 </div>
 
-                <span className="text-lg font-bold text-smfc-white">
-                  {row.points}
-                </span>
+                <div className="hidden min-w-[240px] shrink-0 grid grid-cols-4 gap-3 text-center sm:grid">
+                  {[
+                    { label: "W", value: row.won },
+                    { label: "L", value: row.lost },
+                    {
+                      label: "GD",
+                      value: `${row.goalDifference > 0 ? "+" : ""}${row.goalDifference}`,
+                    },
+                    { label: "Pts", value: row.points },
+                  ].map((stat) => (
+                    <div key={stat.label} className="rounded-lg bg-smfc-black/70 px-3 py-2">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-400">
+                        {stat.label}
+                      </p>
+                      <p className="text-base font-semibold text-smfc-white">
+                        {stat.value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              {/* Stats line */}
-              <div className="flex gap-4 text-xs text-neutral-400 pl-7">
-                <span>
-                  <strong className="text-neutral-200">W</strong> {row.won}
-                </span>
-                <span>
-                  <strong className="text-neutral-200">L</strong> {row.lost}
-                </span>
-                <span>
-                  <strong className="text-neutral-200">GD</strong>{" "}
-                  {row.goalDifference > 0 ? "+" : ""}
-                  {row.goalDifference}
-                </span>
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:hidden">
+                {[
+                  { label: "Pts", value: row.points },
+                  {
+                    label: "GD",
+                    value: `${row.goalDifference > 0 ? "+" : ""}${row.goalDifference}`,
+                  },
+                  { label: "W", value: row.won },
+                  { label: "L", value: row.lost },
+                ].map((stat) => (
+                  <div
+                    key={stat.label}
+                    className="flex items-center justify-between rounded-lg bg-smfc-charcoal/80 px-3 py-2 text-sm font-semibold text-smfc-white"
+                  >
+                    <span className="text-[11px] uppercase tracking-wide text-neutral-400">
+                      {stat.label}
+                    </span>
+                    <span>{stat.value}</span>
+                  </div>
+                ))}
               </div>
             </button>
           )
