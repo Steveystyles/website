@@ -64,14 +64,13 @@ export default function FootballExplorer() {
           return
         }
 
-        // 🔴 Auto-select St Mirren
+        // Auto-select St Mirren if present, otherwise first team
         const stMirren = nextRows.find((r: LeagueRow) =>
           r.teamName.toLowerCase().includes("st mirren")
         )
 
-        if (stMirren) {
-          setTeamId(stMirren.teamId)
-        }
+        setTeamId(stMirren?.teamId ?? nextRows[0].teamId)
+
       })
       .catch(() => {
         if (!alive) return

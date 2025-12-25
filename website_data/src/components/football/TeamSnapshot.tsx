@@ -43,6 +43,11 @@ export default function TeamSnapshot({
   }, [leagueId, season, teamId])
 
   useEffect(() => {
+    // 🔥 Clear stale data immediately when team changes
+    setData(null)
+    setError(null)
+    setShowCrest(true)
+
     if (!teamId) return
 
     const controller = new AbortController()

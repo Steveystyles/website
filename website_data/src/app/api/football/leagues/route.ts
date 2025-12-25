@@ -42,11 +42,15 @@ export async function GET() {
     })
 
     if (leagues.length > 0) {
+      // Fetch current seasons from TheSportsDB and map them by league ID.
+      const fallback = await fetchSportsDbFallback()
+      const seasonMap = new Map(fallback.map((l) => [l.id, l.season]))
       return Response.json(
         leagues.map((l) => ({
           id: l.id,
           name: l.name,
-          season: "2024-2025",
+          // Use the actual current season if available; otherwise default.
+          season: seasonMap.get(l.id) ?? "2024-2025",
         }))
       )
     }
