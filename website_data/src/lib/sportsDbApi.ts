@@ -1,5 +1,6 @@
 const DEFAULT_SPORTS_DB_KEY = "123"
-const SPORTS_DB_BASE_URL = "https://www.thesportsdb.com/api/v1/json"
+const SPORTS_DB_BASE_URL = "https://www.thesportsdb.com/api/v2/
+json"
 
 type QueryValue = string | number | undefined | null
 
