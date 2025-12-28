@@ -1,78 +1,53 @@
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-const DEFAULT_SPORTS_DB_KEY = "123"
-const SPORTS_DB_BASE_URL = "https://www.thesportsdb.com/api/v2/
-json"
-=======
->>>>>>> dev
-import fs from "node:fs"
+import { readSecret } from "@/lib/secrets"
 
-const DEFAULT_SPORTS_DB_KEY = "1"
-const SPORTS_DB_BASE_URL = "https://www.thesportsdb.com/api/v2/json"
-<<<<<<< HEAD
-=======
->>>>>>> f70c93a (Rebuild football explorer with TheSportsDB v2)
->>>>>>> dev
+/**
+ * TheSportsDB helpers
+ *
+ * Notes:
+ * - v2 requires the key in an `X-API-KEY` header and uses path-based endpoints.
+ * - v2 docs currently don’t list a league standings/table endpoint, so we keep a
+ *   small v1 helper for `lookuptable.php` (server-side only).
+ */
 
-type QueryValue = string | number | undefined | null
+const V2_BASE = "https://www.thesportsdb.com/api/v2/json"
+const V1_BASE = "https://www.thesportsdb.com/api/v1/json"
 
-let cachedKey: string | null = null
-
-function readSecretKey(): string | null {
-  const secretPath = process.env.SPORTSDB_API_KEY_FILE ?? "/run/secrets/SPORTSDB_API_KEY"
-
-  try {
-    if (fs.existsSync(secretPath)) {
-      return fs.readFileSync(secretPath, "utf-8").trim()
-    }
-  } catch (error) {
-    console.warn("Unable to read SportsDB secret file", error)
-  }
-
-  return null
+export function normalizeSportsDbQuery(input: string): string {
+  // v2 docs show underscore-separated examples (e.g. english_premier_league)
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_\-]/g, "")
 }
 
-function getSportsDbKey() {
-  if (cachedKey) return cachedKey
-
-  const envKey = process.env.SPORTSDB_API_KEY?.trim()
-  if (envKey) {
-    cachedKey = envKey
-    return cachedKey
-  }
-
-  const secretKey = readSecretKey()
-  if (secretKey) {
-    cachedKey = secretKey
-    return cachedKey
-  }
-
-  console.warn("SPORTSDB_API_KEY missing; using default demo key")
-  cachedKey = DEFAULT_SPORTS_DB_KEY
-  return cachedKey
-}
-
-export async function fetchSportsDb<T>(
-  path: string,
-  query: Record<string, QueryValue> = {}
-): Promise<T> {
-  const params = new URLSearchParams()
-
-  Object.entries(query).forEach(([key, value]) => {
-    if (value === undefined || value === null) return
-    params.set(key, String(value))
-  })
-
-  const key = getSportsDbKey()
-  const trimmedPath = path.startsWith("/") ? path.slice(1) : path
-  const url = `${SPORTS_DB_BASE_URL}/${key}/${trimmedPath}${params.size > 0 ? `?${params.toString()}` : ""}`
-
-  const res = await fetch(url, { cache: "no-store" })
-
+async function fetchJson(url: string, init?: RequestInit) {
+  const res = await fetch(url, { ...init, cache: "no-store" })
   if (!res.ok) {
-    throw new Error(`TheSportsDB request failed: ${res.status}`)
+    const text = await res.text().catch(() => "")
+    throw new Error(`TheSportsDB error ${res.status}: ${text}`)
   }
+  return res.json()
+}
 
-  return (await res.json()) as T
+export async function fetchSportsDbV2(path: string): Promise<any> {
+  const apiKey = readSecret("SPORTS_DB_KEY")
+  const url = new URL(V2_BASE + path)
+  return fetchJson(url.toString(), {
+    headers: {
+      "X-API-KEY": apiKey,
+    },
+  })
+}
+
+/**
+ * v1 helper for standings.
+ *
+ * Even though v1 embeds the key in the URL, this is only called from server-side
+ * Next.js routes, so the key never reaches the browser.
+ */
+export async function fetchSportsDbV1(pathWithQuery: string): Promise<any> {
+  const apiKey = readSecret("SPORTS_DB_KEY")
+  const url = new URL(`${V1_BASE}/${encodeURIComponent(apiKey)}${pathWithQuery}`)
+  return fetchJson(url.toString())
 }
