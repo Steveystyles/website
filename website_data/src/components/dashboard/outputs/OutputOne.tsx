@@ -1,438 +1,253 @@
 "use client"
 
-import Image from "next/image"
-import { useEffect, useMemo, useRef, useState } from "react"
-import OutputOneSkeleton from "./OutputOneSkeleton"
+import { useEffect, useState } from "react"
 
-type League = {
-  idLeague: string
-  strLeague: string
-  strSport?: string
-  strCountry?: string
-  strBadge?: string
+type SearchResult = {
+  type: "league" | "team"
+  id: string
+  name: string
 }
 
-type Team = {
-  idTeam: string
-  strTeam: string
-  strTeamBadge?: string
-  strLeague?: string
-  idLeague?: string
-  strCountry?: string
-  strStadium?: string
-  intFormedYear?: string
-}
-
-type SearchItem =
-  | { kind: "league"; id: string; title: string; subtitle?: string; badge?: string }
-  | { kind: "team"; id: string; title: string; subtitle?: string; badge?: string }
-
-type LeagueRow = {
+type LeagueTableRow = {
   position: number
   teamId: string
   teamName: string
-  won: number
-  lost: number
-  goalDifference: number
   points: number
+  goalDifference: number
   crest: string
 }
 
-async function getJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, { cache: "no-store" })
-  if (!res.ok) throw new Error(await res.text())
-  return res.json()
+type TeamInfo = {
+  idTeam: string
+  strTeam: string
+  strLeague: string
+  strTeamBadge?: string
+  strStadium?: string
+  strDescriptionEN?: string
 }
 
-export default function FootballExplorer() {
-  const [bootLoading, setBootLoading] = useState(true)
+export default function OutputOne() {
+  const [search, setSearch] = useState("")
+  const [results, setResults] = useState<SearchResult[]>([])
+  const [searching, setSearching] = useState(false)
 
-  const [query, setQuery] = useState("")
-  const [remoteLeagues, setRemoteLeagues] = useState<League[]>([])
-  const [remoteTeams, setRemoteTeams] = useState<Team[]>([])
-  const [searchLoading, setSearchLoading] = useState(false)
-  const [searchError, setSearchError] = useState<string | null>(null)
+  const [leagueId, setLeagueId] = useState<string | null>(null)
+  const [leagueName, setLeagueName] = useState("")
+  const [table, setTable] = useState<LeagueTableRow[]>([])
 
-  const [selectedLeague, setSelectedLeague] = useState<League | null>(null)
-  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null)
+  const [team, setTeam] = useState<TeamInfo | null>(null)
+  const [loadingTable, setLoadingTable] = useState(false)
+  const [loadingTeam, setLoadingTeam] = useState(false)
 
-  const [tableRows, setTableRows] = useState<LeagueRow[]>([])
-  const [tableLoading, setTableLoading] = useState(false)
-  const [tableError, setTableError] = useState<string | null>(null)
-
-  // Avoid race conditions for rapid typing
-  const lastSearchId = useRef(0)
+  /* ---------------------------------------------------------
+     SEARCH (v2)
+  --------------------------------------------------------- */
 
   useEffect(() => {
-    const t = setTimeout(() => setBootLoading(false), 300)
-    return () => clearTimeout(t)
-  }, [])
-
-  // Debounced search
-  useEffect(() => {
-    const q = query.trim()
-    setSearchError(null)
-
-    if (q.length < 2) {
-      setRemoteLeagues([])
-      setRemoteTeams([])
-      setSearchLoading(false)
+    if (search.length < 2) {
+      setResults([])
+      setSearching(false)
       return
     }
 
-    setSearchLoading(true)
-    const myId = ++lastSearchId.current
+    setSearching(true)
+    const controller = new AbortController()
+    const timeout = setTimeout(() => {
+      fetch(`/api/football/search?q=${encodeURIComponent(search)}`, {
+        signal: controller.signal,
+      })
+        .then(res => res.json())
+        .then(data => {
+          const leagues =
+            data.leagues?.map((l: any) => ({
+              type: "league",
+              id: l.idLeague,
+              name: l.strLeague,
+            })) ?? []
 
-    const timer = setTimeout(async () => {
-      try {
-        const json = await getJson<{ leagues: League[]; teams: Team[] }>(
-          `/api/football/search?q=${encodeURIComponent(q)}`
-        )
-        // Only apply latest result
-        if (myId !== lastSearchId.current) return
-        setRemoteLeagues(json.leagues ?? [])
-        setRemoteTeams(json.teams ?? [])
-      } catch (e: any) {
-        if (myId !== lastSearchId.current) return
-        setSearchError(e?.message ?? "Search failed")
-        setRemoteLeagues([])
-        setRemoteTeams([])
-      } finally {
-        if (myId === lastSearchId.current) setSearchLoading(false)
-      }
-    }, 250)
+          const teams =
+            data.teams?.map((t: any) => ({
+              type: "team",
+              id: t.idTeam,
+              name: t.strTeam,
+            })) ?? []
 
-    return () => clearTimeout(timer)
-  }, [query])
+          setResults([...leagues, ...teams])
+        })
+        .catch(() => {})
+        .finally(() => setSearching(false))
+    }, 300)
 
-  const suggestions = useMemo<SearchItem[]>(() => {
-    const q = query.trim().toLowerCase()
+    return () => {
+      controller.abort()
+      clearTimeout(timeout)
+    }
+  }, [search])
 
-    const leagues: SearchItem[] = (remoteLeagues ?? [])
-      .filter((l) => (l?.strLeague ?? "").toLowerCase().includes(q))
-      .slice(0, 6)
-      .map((l) => ({
-        kind: "league",
-        id: String(l.idLeague),
-        title: l.strLeague,
-        subtitle: [l.strCountry, l.strSport].filter(Boolean).join(" • ") || undefined,
-        badge: l.strBadge,
-      }))
+  /* ---------------------------------------------------------
+     LEAGUE SELECT
+  --------------------------------------------------------- */
 
-    const teams: SearchItem[] = (remoteTeams ?? [])
-      .filter((t) => (t?.strTeam ?? "").toLowerCase().includes(q))
-      .slice(0, 6)
-      .map((t) => ({
-        kind: "team",
-        id: String(t.idTeam),
-        title: t.strTeam,
-        subtitle: [t.strLeague, t.strCountry].filter(Boolean).join(" • ") || undefined,
-        badge: t.strTeamBadge,
-      }))
+  async function selectLeague(id: string) {
+    setLeagueId(id)
+    setTable([])
+    setTeam(null)
+    setLoadingTable(true)
 
-    // Simple interleave: leagues first (feel free to flip)
-    return [...leagues, ...teams]
-  }, [query, remoteLeagues, remoteTeams])
+    const res = await fetch(`/api/football/league?id=${id}`)
+    const data = await res.json()
 
-  async function selectLeague(idLeague: string) {
-    setSelectedTeam(null)
-    setTableRows([])
-    setTableError(null)
-    setTableLoading(true)
+    setLeagueName(data.strLeague ?? "")
 
-    try {
-      const [{ league }, table] = await Promise.all([
-        getJson<{ league: League | null }>(
-          `/api/football/league?id=${encodeURIComponent(idLeague)}`
-        ),
-        getJson<{ rows: LeagueRow[]; leagueName: string }>(
-          `/api/football/table?leagueId=${encodeURIComponent(idLeague)}`
-        ),
-      ])
+    const tableRes = await fetch(
+      `/api/football/table?leagueId=${id}`
+    )
+    const tableData = await tableRes.json()
 
-      setSelectedLeague(league)
-      setTableRows(table.rows ?? [])
+    setTable(tableData.rows ?? [])
+    setLoadingTable(false)
 
-      // If we have a table, auto-select the top team
-      const top = (table.rows ?? [])[0]
-      if (top?.teamId) {
-        const t = await getJson<{ team: Team | null }>(
-          `/api/football/team?id=${encodeURIComponent(top.teamId)}`
-        )
-        setSelectedTeam(t.team)
-      }
-    } catch (e: any) {
-      setTableError(e?.message ?? "Failed to load league")
-    } finally {
-      setTableLoading(false)
+    if (tableData.rows?.length) {
+      selectTeam(tableData.rows[0].teamId)
     }
   }
 
-  async function selectTeam(idTeam: string) {
-    setTableRows([])
-    setTableError(null)
-    setTableLoading(false)
-    setSelectedLeague(null)
+  /* ---------------------------------------------------------
+     TEAM SELECT
+  --------------------------------------------------------- */
 
-    try {
-      const { team } = await getJson<{ team: Team | null }>(
-        `/api/football/team?id=${encodeURIComponent(idTeam)}`
-      )
-      setSelectedTeam(team)
-    } catch (e: any) {
-      setSearchError(e?.message ?? "Failed to load team")
-    }
+  async function selectTeam(id: string) {
+    setLoadingTeam(true)
+    const res = await fetch(`/api/football/team?id=${id}`)
+    const data = await res.json()
+    setTeam(data)
+    setLoadingTeam(false)
   }
 
-  async function clickTableTeam(teamId: string) {
-    try {
-      const { team } = await getJson<{ team: Team | null }>(
-        `/api/football/team?id=${encodeURIComponent(teamId)}`
-      )
-      setSelectedTeam(team)
-    } catch {
-      // ignore
-    }
-  }
-
-  if (bootLoading) return <OutputOneSkeleton />
+  /* ---------------------------------------------------------
+     UI
+  --------------------------------------------------------- */
 
   return (
     <div className="space-y-4">
-      <header className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold text-smfc-white">Football Explorer</h2>
-          <p className="text-xs text-neutral-400">
-            Search leagues or teams • tap a league to see the table
-          </p>
-        </div>
+      {/* SEARCH */}
+      <div>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search leagues or teams…"
+          className="w-full rounded-md border border-smfc-gold bg-smfc-black px-3 py-2 text-smfc-white"
+        />
 
-        <div className="flex items-center gap-2 rounded-full border border-smfc-grey bg-smfc-black px-3 py-1.5">
-          <span className="h-2 w-2 rounded-full bg-smfc-red" />
-          <span className="text-[11px] text-neutral-300">St Mirren theme</span>
-        </div>
-      </header>
+        {search.length >= 2 && (
+          <div className="mt-2 rounded-md border border-smfc-gold bg-smfc-black">
+            {searching && (
+              <div className="p-2 text-sm text-smfc-gold">
+                Searching…
+              </div>
+            )}
 
-      {/* Search */}
-      <div className="rounded-xl border border-smfc-grey bg-smfc-black p-3">
-        <label className="block text-xs font-medium text-neutral-300">
-          Search
-        </label>
-        <div className="mt-2 flex items-center gap-2">
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="e.g. Scottish Premiership, St Mirren"
-            className="w-full rounded-lg border border-smfc-grey bg-smfc-charcoal px-3 py-2 text-sm text-smfc-white placeholder:text-neutral-500 outline-none focus:border-smfc-red"
-            autoComplete="off"
-          />
-          {searchLoading ? (
-            <div className="h-9 w-9 rounded-lg border border-smfc-grey bg-smfc-charcoal animate-pulse" />
-          ) : (
-            <button
-              type="button"
-              onClick={() => {
-                setQuery("")
-                setRemoteLeagues([])
-                setRemoteTeams([])
-                setSearchError(null)
-              }}
-              className="h-9 px-3 rounded-lg border border-smfc-grey bg-smfc-charcoal text-xs text-neutral-300 hover:border-smfc-red"
-            >
-              Clear
-            </button>
-          )}
-        </div>
+            {!searching && results.length === 0 && (
+              <div className="p-2 text-sm text-smfc-muted">
+                No results
+              </div>
+            )}
 
-        {(searchError || tableError) && (
-          <p className="mt-2 text-xs text-smfc-red">{searchError || tableError}</p>
-        )}
-
-        {/* Suggestion list */}
-        {suggestions.length > 0 && (
-          <div className="mt-3 overflow-hidden rounded-lg border border-smfc-grey">
-            {suggestions.map((s) => (
+            {results.map(r => (
               <button
-                key={`${s.kind}:${s.id}`}
-                type="button"
-                onClick={() =>
-                  s.kind === "league" ? selectLeague(s.id) : selectTeam(s.id)
-                }
-                className="flex w-full items-center gap-3 bg-smfc-black px-3 py-2 text-left hover:bg-smfc-charcoal"
+                key={`${r.type}-${r.id}`}
+                onClick={() => {
+                  setSearch("")
+                  setResults([])
+                  r.type === "league"
+                    ? selectLeague(r.id)
+                    : selectTeam(r.id)
+                }}
+                className="block w-full px-3 py-2 text-left hover:bg-smfc-gold hover:text-black"
               >
-                <div className="relative h-8 w-8 overflow-hidden rounded-md border border-smfc-grey bg-smfc-charcoal">
-                  {s.badge ? (
-                    <Image
-                      src={s.badge}
-                      alt=""
-                      fill
-                      className="object-contain"
-                      sizes="32px"
-                    />
-                  ) : null}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium text-smfc-white">
-                    {s.title}
-                  </div>
-                  {s.subtitle ? (
-                    <div className="truncate text-xs text-neutral-400">{s.subtitle}</div>
-                  ) : null}
-                </div>
-                <span className="rounded-full border border-smfc-grey px-2 py-0.5 text-[10px] text-neutral-300">
-                  {s.kind}
+                <span className="mr-2 text-xs opacity-70">
+                  {r.type === "league" ? "League" : "Team"}
                 </span>
+                {r.name}
               </button>
             ))}
           </div>
         )}
       </div>
 
-      {/* Selected info */}
-      <div className="grid gap-3 md:grid-cols-2">
-        <div className="rounded-xl border border-smfc-grey bg-smfc-black p-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-smfc-white">League</h3>
-            {selectedLeague?.strLeague ? (
-              <span className="text-[11px] text-neutral-400">selected</span>
-            ) : null}
-          </div>
-          {selectedLeague ? (
-            <div className="mt-2">
-              <div className="text-sm text-smfc-white font-medium">
-                {selectedLeague.strLeague}
-              </div>
-              <div className="mt-1 text-xs text-neutral-400">
-                {[selectedLeague.strCountry, selectedLeague.strSport]
-                  .filter(Boolean)
-                  .join(" • ")}
-              </div>
+      {/* LEAGUE TABLE */}
+      {leagueId && (
+        <div className="rounded-md border border-smfc-gold p-3">
+          <h2 className="mb-2 text-smfc-gold font-bold">
+            {leagueName}
+          </h2>
+
+          {loadingTable && (
+            <div className="text-sm text-smfc-muted">
+              Loading table…
             </div>
-          ) : (
-            <p className="mt-2 text-xs text-neutral-400">No league selected.</p>
           )}
+
+          {!loadingTable &&
+            table.map(row => (
+              <button
+                key={row.teamId}
+                onClick={() => selectTeam(row.teamId)}
+                className="flex w-full items-center gap-2 px-2 py-1 text-left hover:bg-smfc-gold hover:text-black"
+              >
+                <span className="w-6">{row.position}</span>
+                <img
+                  src={row.crest}
+                  alt=""
+                  className="h-5 w-5"
+                />
+                <span className="flex-1">
+                  {row.teamName}
+                </span>
+                <span>{row.points}</span>
+              </button>
+            ))}
         </div>
+      )}
 
-        <div className="rounded-xl border border-smfc-grey bg-smfc-black p-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-smfc-white">Team</h3>
-            {selectedTeam?.strTeam ? (
-              <span className="text-[11px] text-neutral-400">selected</span>
-            ) : null}
-          </div>
+      {/* TEAM INFO */}
+      {team && (
+        <div className="rounded-md border border-smfc-gold p-3">
+          {loadingTeam && (
+            <div className="text-sm text-smfc-muted">
+              Loading team…
+            </div>
+          )}
 
-          {selectedTeam ? (
-            <div className="mt-2 flex items-center gap-3">
-              <div className="relative h-12 w-12 overflow-hidden rounded-lg border border-smfc-grey bg-smfc-charcoal">
-                {selectedTeam.strTeamBadge ? (
-                  <Image
-                    src={selectedTeam.strTeamBadge}
+          {!loadingTeam && (
+            <>
+              <div className="flex items-center gap-3">
+                {team.strTeamBadge && (
+                  <img
+                    src={team.strTeamBadge}
                     alt=""
-                    fill
-                    className="object-contain"
-                    sizes="48px"
+                    className="h-12 w-12"
                   />
-                ) : null}
-              </div>
-              <div className="min-w-0">
-                <div className="truncate text-sm font-semibold text-smfc-white">
-                  {selectedTeam.strTeam}
+                )}
+                <div>
+                  <h3 className="font-bold text-smfc-gold">
+                    {team.strTeam}
+                  </h3>
+                  <p className="text-sm text-smfc-muted">
+                    {team.strLeague}
+                  </p>
                 </div>
-                <div className="truncate text-xs text-neutral-400">
-                  {[selectedTeam.strLeague, selectedTeam.strCountry]
-                    .filter(Boolean)
-                    .join(" • ")}
-                </div>
-                {selectedTeam.strStadium ? (
-                  <div className="truncate text-xs text-neutral-500">
-                    {selectedTeam.strStadium}
-                  </div>
-                ) : null}
               </div>
-            </div>
-          ) : (
-            <p className="mt-2 text-xs text-neutral-400">No team selected.</p>
+
+              {team.strStadium && (
+                <p className="mt-2 text-sm">
+                  Stadium: {team.strStadium}
+                </p>
+              )}
+            </>
           )}
         </div>
-      </div>
-
-      {/* Table */}
-      <div className="rounded-xl border border-smfc-grey bg-smfc-black p-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-smfc-white">League Table</h3>
-          {tableLoading ? (
-            <span className="text-[11px] text-neutral-400">loading…</span>
-          ) : selectedLeague ? (
-            <span className="text-[11px] text-neutral-400">tap a team</span>
-          ) : (
-            <span className="text-[11px] text-neutral-500">select a league</span>
-          )}
-        </div>
-
-        {!selectedLeague ? (
-          <p className="mt-2 text-xs text-neutral-400">
-            Pick a league from the search results to load the current table.
-          </p>
-        ) : tableRows.length === 0 && !tableLoading ? (
-          <p className="mt-2 text-xs text-neutral-400">
-            No table returned for this league.
-          </p>
-        ) : (
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="text-neutral-400">
-                <tr className="border-b border-smfc-grey">
-                  <th className="py-2 pr-2 w-10">#</th>
-                  <th className="py-2 pr-2">Team</th>
-                  <th className="py-2 pr-2 w-10">W</th>
-                  <th className="py-2 pr-2 w-10">L</th>
-                  <th className="py-2 pr-2 w-12">GD</th>
-                  <th className="py-2 pr-0 w-12 text-smfc-white">Pts</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tableRows.map((r) => (
-                  <tr
-                    key={r.teamId}
-                    className="border-b border-smfc-grey/60 hover:bg-smfc-charcoal cursor-pointer"
-                    onClick={() => clickTableTeam(r.teamId)}
-                  >
-                    <td className="py-2 pr-2 text-neutral-300">{r.position}</td>
-                    <td className="py-2 pr-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="relative h-5 w-5 overflow-hidden rounded border border-smfc-grey bg-smfc-charcoal">
-                          {r.crest ? (
-                            <Image
-                              src={r.crest}
-                              alt=""
-                              fill
-                              className="object-contain"
-                              sizes="20px"
-                            />
-                          ) : null}
-                        </div>
-                        <span
-                          className={`truncate ${
-                            selectedTeam?.idTeam === r.teamId
-                              ? "text-smfc-white font-semibold"
-                              : "text-neutral-200"
-                          }`}
-                        >
-                          {r.teamName}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-2 pr-2 text-neutral-300">{r.won}</td>
-                    <td className="py-2 pr-2 text-neutral-300">{r.lost}</td>
-                    <td className="py-2 pr-2 text-neutral-300">{r.goalDifference}</td>
-                    <td className="py-2 pr-0 text-smfc-white font-semibold">{r.points}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   )
 }

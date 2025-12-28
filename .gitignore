@@ -13,4 +13,6 @@ node_modules
 **/volumes
 **/data
 
+# DB Data
+/data 
 

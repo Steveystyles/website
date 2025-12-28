@@ -1,31 +1,23 @@
-import { NextResponse } from "next/server"
-import { fetchSportsDbV2, normalizeSportsDbQuery } from "@/lib/sportsDbApi"
-
 export const runtime = "nodejs"
+
+import { NextResponse } from "next/server"
+import { fetchSportsDbV2 } from "@/lib/sportsDbApi"
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
-  const qRaw = searchParams.get("q") ?? ""
-  const q = normalizeSportsDbQuery(qRaw)
+  const q = searchParams.get("q")
 
-  if (q.length < 2) {
-    return NextResponse.json({ leagues: [], teams: [] })
+  if (!q || q.length < 2) {
+    return NextResponse.json({ teams: [], leagues: [] })
   }
 
-  try {
-    const [leagueJson, teamJson] = await Promise.all([
-      fetchSportsDbV2(`/search/league/${encodeURIComponent(q)}`),
-      fetchSportsDbV2(`/search/team/${encodeURIComponent(q)}`),
-    ])
+  const [teamsRes, leaguesRes] = await Promise.all([
+    fetchSportsDbV2(`/searchteams.php?t=${encodeURIComponent(q)}`),
+    fetchSportsDbV2(`/search_all_leagues.php?l=${encodeURIComponent(q)}`),
+  ])
 
-    return NextResponse.json({
-      leagues: leagueJson?.leagues ?? [],
-      teams: teamJson?.teams ?? [],
-    })
-  } catch (e: any) {
-    return NextResponse.json(
-      { error: e?.message ?? "Search failed" },
-      { status: 500 }
-    )
-  }
+  return NextResponse.json({
+    teams: teamsRes?.teams ?? [],
+    leagues: leaguesRes?.leagues ?? [],
+  })
 }

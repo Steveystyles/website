@@ -1,53 +1,31 @@
-import { readSecret } from "@/lib/secrets"
+const BASE_V2 = "https://www.thesportsdb.com/api/v2/json"
 
-/**
- * TheSportsDB helpers
- *
- * Notes:
- * - v2 requires the key in an `X-API-KEY` header and uses path-based endpoints.
- * - v2 docs currently don’t list a league standings/table endpoint, so we keep a
- *   small v1 helper for `lookuptable.php` (server-side only).
- */
+export async function fetchSportsDbV2(
+  path: string,
+  options?: { method?: "GET" | "POST" }
+) {
+  const apiKey = process.env.SPORTS_DB_KEY
 
-const V2_BASE = "https://www.thesportsdb.com/api/v2/json"
-const V1_BASE = "https://www.thesportsdb.com/api/v1/json"
-
-export function normalizeSportsDbQuery(input: string): string {
-  // v2 docs show underscore-separated examples (e.g. english_premier_league)
-  return input
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "_")
-    .replace(/[^a-z0-9_\-]/g, "")
-}
-
-async function fetchJson(url: string, init?: RequestInit) {
-  const res = await fetch(url, { ...init, cache: "no-store" })
-  if (!res.ok) {
-    const text = await res.text().catch(() => "")
-    throw new Error(`TheSportsDB error ${res.status}: ${text}`)
+  if (!apiKey) {
+    console.error("❌ SPORTS_DB_KEY missing")
+    return null
   }
-  return res.json()
-}
 
-export async function fetchSportsDbV2(path: string): Promise<any> {
-  const apiKey = readSecret("SPORTS_DB_KEY")
-  const url = new URL(V2_BASE + path)
-  return fetchJson(url.toString(), {
+  const res = await fetch(`${BASE_V2}${path}`, {
+    method: options?.method ?? "GET",
     headers: {
       "X-API-KEY": apiKey,
+      "Content-Type": "application/json",
     },
+    cache: "no-store",
   })
-}
 
-/**
- * v1 helper for standings.
- *
- * Even though v1 embeds the key in the URL, this is only called from server-side
- * Next.js routes, so the key never reaches the browser.
- */
-export async function fetchSportsDbV1(pathWithQuery: string): Promise<any> {
-  const apiKey = readSecret("SPORTS_DB_KEY")
-  const url = new URL(`${V1_BASE}/${encodeURIComponent(apiKey)}${pathWithQuery}`)
-  return fetchJson(url.toString())
+  const text = await res.text()
+
+  try {
+    return JSON.parse(text)
+  } catch {
+    console.error("❌ SportsDB returned non-JSON:", text.slice(0, 200))
+    return null
+  }
 }
