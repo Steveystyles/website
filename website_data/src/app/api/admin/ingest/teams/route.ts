@@ -5,17 +5,9 @@ import { fetchSportsDbV2 } from "@/lib/sportsDbApi"
 import { db } from "@/lib/search-db/db"
 
 export async function POST() {
-  // Get all leagues already ingested
   const leagues = db
-    .prepare("SELECT id FROM search_index WHERE type = 'league'")
-    .all() as { id: string }[]
-
-  if (!leagues.length) {
-    return NextResponse.json(
-      { error: "No leagues found. Run leagues ingest first." },
-      { status: 400 }
-    )
-  }
+    .prepare(`SELECT id FROM search_index WHERE type = 'league'`)
+    .all()
 
   const insert = db.prepare(`
     INSERT OR REPLACE INTO search_index
@@ -23,43 +15,55 @@ export async function POST() {
     VALUES (?, ?, 'team', ?, ?, ?, ?, ?)
   `)
 
-  let inserted = 0
+  const failedLeagues: string[] = []
+  let teamsInserted = 0
 
-  const tx = db.transaction((rows: any[]) => {
-    for (const t of rows) {
-      if (!t?.idTeam || !t?.strTeam) continue
+  for (const l of leagues) {
+    const leagueId = l.id
 
-      const searchText = [
-        t.strTeam,
-        t.strLeague,
-        t.strCountry,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-
-      insert.run(
-        t.idTeam,
-        t.strTeam,
-        t.strSport ?? null,
-        t.strCountry ?? null,
-        t.strBadge ?? null,
-        t.idLeague ?? null,
-        searchText
-      )
-
-      inserted++
-    }
-  })
-
-  for (const league of leagues) {
     const data = await fetchSportsDbV2(
-      `/lookup_all_teams.php?id=${league.id}`
+      `/teams/league/${leagueId}`,
+      { method: "GET" }
     )
 
-    const teams = data?.teams ?? []
-    if (teams.length) tx(teams)
+    if (!data?.teams || !Array.isArray(data.teams)) {
+      failedLeagues.push(leagueId)
+      continue
+    }
+
+    const tx = db.transaction((teams: any[]) => {
+      for (const t of teams) {
+        if (!t.idTeam || !t.strTeam) continue
+
+        const searchText = [
+          t.strTeam,
+          t.strCountry,
+          t.strLeague,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+
+        insert.run(
+          t.idTeam,
+          t.strTeam,
+          "Soccer",
+          t.strCountry ?? null,
+          t.strBadge ?? null,
+          leagueId,
+          searchText
+        )
+
+        teamsInserted++
+      }
+    })
+
+    tx(data.teams)
   }
 
-  return NextResponse.json({ inserted })
+  return NextResponse.json({
+    leaguesProcessed: leagues.length,
+    teamsInserted,
+    failedLeagues,
+  })
 }

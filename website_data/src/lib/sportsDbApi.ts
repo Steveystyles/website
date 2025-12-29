@@ -11,21 +11,30 @@ export async function fetchSportsDbV2(
     return null
   }
 
-  const res = await fetch(`${BASE_V2}${path}`, {
+  const url = `${BASE_V2}${path}`
+
+  const res = await fetch(url, {
     method: options?.method ?? "GET",
     headers: {
       "X-API-KEY": apiKey,
-      "Content-Type": "application/json",
     },
     cache: "no-store",
   })
+
+  if (!res.ok) {
+    console.error(`❌ SportsDB ${res.status} for ${url}`)
+    return null
+  }
 
   const text = await res.text()
 
   try {
     return JSON.parse(text)
   } catch {
-    console.error("❌ SportsDB returned non-JSON:", text.slice(0, 200))
+    console.error(
+      "❌ SportsDB returned non-JSON:",
+      text.slice(0, 200)
+    )
     return null
   }
 }
