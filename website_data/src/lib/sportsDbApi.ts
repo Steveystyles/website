@@ -5,36 +5,22 @@ export async function fetchSportsDbV2(
   options?: { method?: "GET" | "POST" }
 ) {
   const apiKey = process.env.SPORTS_DB_KEY
+  if (!apiKey) throw new Error("SPORTS_DB_KEY missing")
 
-  if (!apiKey) {
-    console.error("❌ SPORTS_DB_KEY missing")
-    return null
-  }
-
-  const url = `${BASE_V2}${path}`
-
-  const res = await fetch(url, {
-    method: options?.method ?? "GET",
-    headers: {
-      "X-API-KEY": apiKey,
-    },
-    cache: "no-store",
-  })
-
-  if (!res.ok) {
-    console.error(`❌ SportsDB ${res.status} for ${url}`)
-    return null
-  }
+  const res = await fetch(
+    `${BASE_V2}/${apiKey}${path}`, // 🔑 key in URL
+    {
+      method: options?.method ?? "GET",
+      cache: "no-store",
+    }
+  )
 
   const text = await res.text()
 
   try {
     return JSON.parse(text)
   } catch {
-    console.error(
-      "❌ SportsDB returned non-JSON:",
-      text.slice(0, 200)
-    )
+    console.error("❌ SportsDB returned non-JSON:", text.slice(0, 200))
     return null
   }
 }
