@@ -11,10 +11,10 @@ type Props = {
 }
 
 const TABS: { key: OutputKey; label: string }[] = [
-  { key: "one", label: "Home" },
-  { key: "two", label: "Grid" },
-  { key: "three", label: "Team" },
-  { key: "four", label: "Settings" },
+  { key: "one", label: "Scores" },
+  { key: "two", label: "Sports APIs" },
+  { key: "three", label: "Scotland" },
+  { key: "four", label: "Puzzles" },
 ]
 
 /**
