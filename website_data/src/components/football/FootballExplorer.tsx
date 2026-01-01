@@ -4,66 +4,50 @@ import { useEffect, useState, useRef } from "react"
 import { SoccerIndex } from "@/lib/data/soccerIndex"
 import { buildSuggestions } from "@/lib/search/buildSuggestions"
 import { SearchSuggestion } from "@/lib/search/types"
+import TeamRowCard from "./TeamRowCard"
 
 type LeagueRow = {
   idTeam: string
   team: string
   points: number
   position: number
+  goalDiff: number
   badge?: string
   form?: ("W" | "D" | "L")[]
 }
 
-const DEFAULT_LEAGUE_ID = "4330" // Scottish Premiership
-const DEFAULT_TEAM_NAME = "St Mirren"
+const ROW_HEIGHT = 64
+const VISIBLE_ROWS = 7
+const DEFAULT_LEAGUE_ID = "4330"
+
+/* ---------- helpers ---------- */
 
 function getFormFromEvents(events: any[], teamId: string) {
-  return events.slice(0, 5).map((e) => {
+  return events.slice(0, 5).map(e => {
     const isHome = e.idHomeTeam === teamId
-    const home = Number(e.intHomeScore)
-    const away = Number(e.intAwayScore)
-
-    if (home === away) return "D"
-    return (isHome && home > away) || (!isHome && away > home) ? "W" : "L"
+    const h = Number(e.intHomeScore)
+    const a = Number(e.intAwayScore)
+    if (h === a) return "D"
+    return (isHome && h > a) || (!isHome && a > h) ? "W" : "L"
   })
 }
 
-function FormDots({ form }: { form?: ("W" | "D" | "L")[] }) {
-  if (!form) return null
-
-  return (
-    <div className="flex gap-1 mt-1">
-      {form.map((r, i) => (
-        <span
-          key={i}
-          className={`h-2.5 w-2.5 rounded-full ${
-            r === "W"
-              ? "bg-green-500"
-              : r === "D"
-              ? "bg-yellow-500"
-              : "bg-red-500"
-          }`}
-        />
-      ))}
-    </div>
-  )
-}
+/* ---------- component ---------- */
 
 export default function FootballExplorer({ index }: { index: SoccerIndex }) {
   const [query, setQuery] = useState("")
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([])
   const [rows, setRows] = useState<LeagueRow[]>([])
-  const [leagueId, setLeagueId] = useState<string | null>(null)
   const [highlightTeam, setHighlightTeam] = useState<string | null>(null)
   const [teamInfo, setTeamInfo] = useState<any>(null)
   const [lastMatch, setLastMatch] = useState<any>(null)
   const [loading, setLoading] = useState(false)
 
   const fetchingRef = useRef(false)
+  const listRef = useRef<HTMLDivElement | null>(null)
+  const lastMatchCache = useRef<Record<string, any>>({})
 
-  /* -----------------------------
-   * Initial load (St Mirren)
-   * --------------------------- */
+  /* ---------- initial load ---------- */
   useEffect(() => {
     const league = index.find(l => l.idLeague === DEFAULT_LEAGUE_ID)
     const team = league?.teams.find(t =>
@@ -77,21 +61,28 @@ export default function FootballExplorer({ index }: { index: SoccerIndex }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  /* ---------- auto-centre active row ---------- */
+  useEffect(() => {
+    if (!highlightTeam || !listRef.current) return
+    const el = listRef.current.querySelector(
+      `[data-team-id="${highlightTeam}"]`
+    ) as HTMLElement | null
+
+    el?.scrollIntoView({ behavior: "smooth", block: "center" })
+  }, [highlightTeam])
+
   function onChange(value: string) {
     setQuery(value)
     setSuggestions(buildSuggestions(value, index))
   }
 
-  /* -----------------------------
-   * Load league (ONCE)
-   * --------------------------- */
+  /* ---------- load league ---------- */
   async function loadLeague(idLeague: string, teamId?: string) {
     if (fetchingRef.current) return
     fetchingRef.current = true
+    setLoading(true)
 
     try {
-      setLoading(true)
-      setLeagueId(idLeague)
       setRows([])
       setTeamInfo(null)
       setLastMatch(null)
@@ -103,24 +94,22 @@ export default function FootballExplorer({ index }: { index: SoccerIndex }) {
       const league = index.find(l => l.idLeague === idLeague)
 
       const baseRows: LeagueRow[] = tableRes.table.map((r: any) => {
-        const teamFromIndex = league?.teams.find(
-          t => t.idTeam === String(r.idTeam)
-        )
-
+        const t = league?.teams.find(x => x.idTeam === String(r.idTeam))
         return {
           idTeam: String(r.idTeam),
           team: r.strTeam,
           points: Number(r.intPoints),
           position: Number(r.intRank),
-          badge: teamFromIndex?.badge,
+          goalDiff: Number(r.intGoalDifference),
+          badge: t?.badge,
         }
       })
 
       setRows(baseRows)
 
-      // Fetch form in background
+      // fetch form in background
       Promise.all(
-        baseRows.map(async (row) => {
+        baseRows.map(async row => {
           try {
             const res = await fetch(
               `/api/last-match?team=${row.idTeam}`
@@ -139,150 +128,148 @@ export default function FootballExplorer({ index }: { index: SoccerIndex }) {
       ).then(results => {
         setRows(prev =>
           prev.map(r => {
-            const found = results.find(x => x?.idTeam === r.idTeam)
-            return found ? { ...r, form: found.form } : r
+            const f = results.find(x => x?.idTeam === r.idTeam)
+            return f ? { ...r, form: f.form } : r
           })
         )
       })
 
-      if (teamId) {
-        selectTeam(teamId)
-      } else {
-        selectTeam(baseRows[0]?.idTeam)
-      }
+      selectTeam(teamId ?? baseRows[0]?.idTeam)
     } finally {
       fetchingRef.current = false
       setLoading(false)
     }
   }
 
-  /* -----------------------------
-   * Select team ONLY
-   * --------------------------- */
+  /* ---------- select team ---------- */
   async function selectTeam(idTeam?: string) {
-    if (!idTeam) return
-
+    if (!idTeam || loading) return
     setHighlightTeam(idTeam)
 
-    const teamRes = await fetch(
-      `/api/team?team=${idTeam}`
-    ).then(r => r.json())
-
+    const teamRes = await fetch(`/api/team?team=${idTeam}`).then(r => r.json())
     setTeamInfo(teamRes.lookup?.[0] ?? null)
 
-    const lastRes = await fetch(
-      `/api/last-match?team=${idTeam}`
-    ).then(r => r.json())
-
-    setLastMatch(lastRes.results?.[0] ?? null)
+    if (lastMatchCache.current[idTeam]) {
+      setLastMatch(lastMatchCache.current[idTeam])
+    } else {
+      const lastRes = await fetch(
+        `/api/last-match?team=${idTeam}`
+      ).then(r => r.json())
+      const match = lastRes.results?.[0] ?? null
+      lastMatchCache.current[idTeam] = match
+      setLastMatch(match)
+    }
   }
 
   async function onSelect(s: SearchSuggestion) {
     setSuggestions([])
     setQuery(s.label)
-
-    if (s.type === "team") {
-      await loadLeague(s.idLeague, s.idTeam)
-    } else {
-      await loadLeague(s.idLeague)
-    }
+    await loadLeague(s.idLeague, s.type === "team" ? s.idTeam : undefined)
   }
 
+  /* ---------- render ---------- */
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      {/* Search */}
-      <div className="sticky top-0 z-20 bg-smfc-charcoal pb-3">
-        <input
-          value={query}
-          onFocus={() => {
-            setQuery("")
-            setSuggestions([])
-          }}
-          onChange={e => onChange(e.target.value)}
-          placeholder="Search team or league…"
-          className="w-full rounded-xl bg-neutral-900 border border-smfc-grey px-4 py-3 text-base"
-        />
-      </div>
+      <div className="mx-auto w-full max-w-md px-3 space-y-3">
 
-      {/* Suggestions */}
-      {suggestions.length > 0 && (
-        <ul className="rounded-lg border border-smfc-grey bg-neutral-900 divide-y divide-smfc-grey">
-          {suggestions.map((s, i) => (
-            <li
-              key={i}
-              onClick={() => onSelect(s)}
-              className="px-3 py-2 cursor-pointer hover:bg-neutral-800"
-            >
-              {s.label}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {/* Team panel */}
-      {teamInfo && (
-        <div className="
-          sticky top-0 z-10
-          mb-3
-          rounded-2xl
-          border border-smfc-grey
-          bg-neutral-900/95
-          p-4
-          backdrop-blur
-          shadow-lg
-        ">
-          <div className="flex items-center gap-3 mb-2">
-            {teamInfo.strBadge && (
-              <img src={teamInfo.strBadge} className="h-10 w-10" />
-            )}
-            <h3 className="font-semibold">{teamInfo.strTeam}</h3>
+        {/* Search */}
+        <div className="relative">
+          <div className="rounded-2xl border border-neutral-700 bg-neutral-900 px-4 py-3">
+            <input
+              value={query}
+              onFocus={() => {
+                setQuery("")
+              }}
+              onChange={e => {
+                const value = e.target.value
+                setQuery(value)
+                setSuggestions(buildSuggestions(value, index))
+              }}
+              placeholder="Search team or league…"
+              className="
+                w-full
+                bg-transparent
+                outline-none
+                text-base
+                placeholder-neutral-500
+              "
+            />
           </div>
-
-          {lastMatch && (
-            <div className="text-sm text-neutral-300">
-              {lastMatch.strHomeTeam} {lastMatch.intHomeScore}
-              {" – "}
-              {lastMatch.intAwayScore} {lastMatch.strAwayTeam}
+          {suggestions.length > 0 && (
+            <div className="absolute z-20 mt-2 w-full rounded-xl border border-neutral-700 bg-neutral-900 shadow-lg">
+              {suggestions.map((s, i) => (
+                <div
+                  key={i}
+                  onClick={() => onSelect(s)}
+                  className="px-4 py-2 text-sm hover:bg-neutral-800 cursor-pointer"
+                >
+                  {s.label}
+                </div>
+              ))}
             </div>
           )}
         </div>
-      )}
 
-      {/* League list */}
-      {rows.length > 0 && (
-        <div className="flex-1 overflow-y-auto pb-24">
-          <div className="divide-y divide-neutral-800 rounded-lg border border-smfc-grey bg-neutral-900">
-            {rows.map(r => (
-              <button
-                key={r.idTeam}
-                onClick={() => selectTeam(r.idTeam)}
-                className={`w-full flex items-center gap-3 px-4 py-4 text-left ${
-                  r.idTeam === highlightTeam
-                    ? "bg-smfc-red/30 text-smfc-white"
-                    : "hover:bg-neutral-800"
+        {/* Team card */}
+        {teamInfo && (
+          <div className="rounded-2xl border border-neutral-700 bg-neutral-900 p-4">
+            <div className="flex items-center gap-3 mb-1">
+              {teamInfo.strBadge && (
+                <img src={teamInfo.strBadge} className="h-10 w-10" />
+              )}
+              <div className="font-semibold">{teamInfo.strTeam}</div>
+            </div>
+
+            {lastMatch && (
+              <div className="text-xs text-neutral-400">
+                Last: {lastMatch.strHomeTeam} {lastMatch.intHomeScore}
+                {" – "}
+                {lastMatch.intAwayScore} {lastMatch.strAwayTeam}
+              </div>
+            )}
+
+            <div className="text-xs text-neutral-500 mt-1">
+              Next match coming soon
+            </div>
+          </div>
+        )}
+
+        {/* League list */}
+        {rows.length > 0 && (
+          <div className="pb-24">
+            <div
+              className="relative rounded-2xl border border-neutral-700 bg-neutral-900 overflow-hidden"
+              style={{ height: `${ROW_HEIGHT * VISIBLE_ROWS}px` }}
+            >
+              {/* fades */}
+              <div className="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-neutral-900 to-transparent z-10" />
+              <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-neutral-900 to-transparent z-10" />
+
+              <div
+                ref={listRef}
+                className={`h-full overflow-y-auto snap-y snap-mandatory scroll-smooth ${
+                  loading ? "pointer-events-none opacity-60" : ""
                 }`}
               >
-                <div className="w-6 text-sm text-neutral-400">
-                  {r.position}
-                </div>
-
-                {r.badge && (
-                  <img src={r.badge} className="h-8 w-8" />
-                )}
-
-                <div className="flex-1">
-                  <div className="font-medium">{r.team}</div>
-                  <FormDots form={r.form} />
-                </div>
-
-                <div className="text-sm font-semibold">
-                  {r.points}
-                </div>
-              </button>
-            ))}
+                {rows.map(r => (
+                  <TeamRowCard
+                    key={r.idTeam}
+                    position={r.position}
+                    team={r.team}
+                    badge={r.badge}
+                    goalDiff={r.goalDiff}
+                    points={r.points}
+                    form={r.form}
+                    active={r.idTeam === highlightTeam}
+                    onClick={() => selectTeam(r.idTeam)}
+                    data-team-id={r.idTeam}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
