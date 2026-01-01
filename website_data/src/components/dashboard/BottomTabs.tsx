@@ -14,7 +14,7 @@ const TABS: { key: OutputKey; label: string }[] = [
   { key: "one", label: "Scores" },
   { key: "two", label: "Sports APIs" },
   { key: "three", label: "Scotland" },
-  { key: "four", label: "Puzzles" },
+  { key: "four", label: "Live Scores" },
 ]
 
 /**
